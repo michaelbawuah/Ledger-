@@ -17,6 +17,7 @@ struct RiskConfig {
 };
 
 struct RiskContext {
+    // Caller-supplied single-instrument exposure. Reserve pending orders externally.
     std::int64_t position{};
     Price market_valuation_price{};
     bool operator==(const RiskContext&) const = default;
@@ -58,8 +59,11 @@ public:
         if (command.side > Side::Sell) return {RiskReject::InvalidSide};
         if (command.tif > TimeInForce::FOK) return {RiskReject::InvalidTimeInForce};
         if (command.id == 0) return {RiskReject::InvalidId};
+        // This helper does not look up order IDs. The book decides whether it exists.
         // A valid cancel must remain possible even when exposure exceeds limits.
         if (command.action == Action::Cancel) return {RiskReject::None, context.position};
+        // Replace is deliberately assessed as a full new quantity, not a delta.
+        // The caller must not assume an old order's reserved exposure is released here.
         if (command.quantity == 0) return {RiskReject::InvalidQuantity};
         if (command.quantity > config_.max_order_quantity) return {RiskReject::OrderQuantityLimit};
         const bool market = command.action == Action::Market;

@@ -207,6 +207,56 @@ void projected_inventory_limits() {
     require(extreme.evaluate(command, {low, 0}).projected_inventory == low + 1,
             "INT64_MIN buy recovery differs");
 }
+
+void cancel_and_conservative_replace() {
+    using namespace ledger;
+    RiskConfig config{};
+    config.max_order_quantity = 10;
+    config.max_order_notional = 1'000;
+    config.max_abs_inventory = 100;
+    config.min_price = 95;
+    config.max_price = 105;
+    const RiskPolicy policy(config);
+    auto command = limit_order();
+    command.action = Action::Cancel;
+    command.price = std::numeric_limits<Price>::min();
+    command.quantity = std::numeric_limits<Quantity>::max();
+    const RiskContext breached{std::numeric_limits<std::int64_t>::min(), -1};
+    for (const auto side : {Side::Buy, Side::Sell}) {
+        for (const auto tif : {TimeInForce::GTC, TimeInForce::IOC, TimeInForce::FOK}) {
+            command.side = side;
+            command.tif = tif;
+            const auto decision = policy.evaluate(command, breached);
+            require(decision.approved() && decision.projected_inventory == breached.position,
+                    "valid cancel was blocked by exposure");
+            require(decision.valuation_price == 0 && decision.order_notional == 0,
+                    "cancel diagnostics imply an exposure change");
+        }
+    }
+    command.id = 0;
+    expect(policy, command, RiskReject::InvalidId, breached);
+    command.id = 42;
+    command.side = static_cast<Side>(2);
+    expect(policy, command, RiskReject::InvalidSide, breached);
+    command.side = Side::Buy;
+    command.tif = static_cast<TimeInForce>(3);
+    expect(policy, command, RiskReject::InvalidTimeInForce, breached);
+
+    command = limit_order();
+    command.action = Action::Replace;
+    expect(policy, command, RiskReject::InventoryLimit, {95, 0});
+    command.quantity = 5;
+    const auto approved = policy.evaluate(command, {95, 0});
+    require(approved.approved() && approved.projected_inventory == 100,
+            "replace quantity was not assessed in full");
+    require(policy.evaluate(command, {95, 0}) == approved, "evaluation retained hidden exposure state");
+    require(policy.config() == config, "evaluation mutated the policy");
+    command.quantity = 11;
+    const auto rejected = policy.evaluate(command, {95, 0});
+    require(!rejected.approved() && rejected.projected_inventory == 0 &&
+            rejected.valuation_price == 0 && rejected.order_notional == 0,
+            "rejected decision leaked a partially assessed exposure");
+}
 } // namespace
 
 int main() {
@@ -217,7 +267,8 @@ int main() {
         integer_price_band();
         notional_without_overflow();
         projected_inventory_limits();
-        std::cout << "PASS risk validation, notional, and signed inventory boundaries\n";
+        cancel_and_conservative_replace();
+        std::cout << "PASS risk boundaries, cancellation, and conservative replacement\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL " << error.what() << '\n';
