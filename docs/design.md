@@ -38,7 +38,7 @@ therefore isolates the search representation on an identical input stream.
 | Append/unlink FIFO node | O(1) | O(1) |
 | Empty-best price search | O(P) linear; O(ceil(P/64)) bitmap worst case | Tree erase/find O(log L) |
 | Match | O(T + price search + ID maintenance) | O(T + level/tree maintenance) |
-| FOK preflight | O(P) worst case | O(L) worst case |
+| FOK preflight | O(L + ceil(P/64)) bitmap; O(P) legacy scan | O(L) worst case |
 | Startup storage | O(P + N), including report storage | Grows with live orders/levels |
 
 P is the configured price range, N live-order capacity, L occupied levels and T

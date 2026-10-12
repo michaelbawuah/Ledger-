@@ -20,8 +20,8 @@ Runs default to three and must be odd, between one and nine.
 | --- | --- | --- | --- |
 | `reference` | Ordered STL levels | Ordered STL levels | Independently implemented semantics |
 | `fast-linear` | Linear tick search | Linear tick search | Full linear-search baseline |
-| `fast-bitmap` | Hierarchical bitmap | Hierarchical bitmap | Optimized implementation |
-| `fast-fok-linear` | Hierarchical bitmap | Linear tick search | Isolate the FOK preflight change |
+| `fast-bitmap` | Occupancy bitmap | Occupancy bitmap | Optimized implementation |
+| `fast-fok-linear` | Occupancy bitmap | Linear tick search | Isolate the FOK preflight change |
 
 The FOK comparison uses `fast-bitmap` and `fast-fok-linear` with matching profile,
 seed, depth, domain, command count, and run number. Their common price lookup and
@@ -94,7 +94,7 @@ local files without network access. It recursively discovers study directories:
 
 ```sh
 python3 tools/verify_study.py --study-root bench/results/study
-python3 tools/verify_study.py --study-root bench/results/study --plot-manifest docs/charts/manifest.json --out bench/results/study-audit.json
+python3 tools/verify_study.py --study-root bench/results/study --plot-manifest docs/figures/study/plot-manifest.json --out bench/results/study-audit.json
 python3 -m unittest discover -s tests/tooling -p 'test_verify_study.py'
 ```
 

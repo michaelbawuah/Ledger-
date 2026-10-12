@@ -38,7 +38,7 @@ def main():
     parser.add_argument('--outdir', type=pathlib.Path, default=ROOT / 'bench/results/study')
     parser.add_argument('--cpu', type=int, default=None, help='Linux process affinity, optional')
     parser.add_argument('--smoke', action='store_true')
-    parser.add_argument('--resume', action='store_true', help='Skip completed cells with summary.json')
+    parser.add_argument('--resume', action='store_true', help='Reuse cells that pass the independent evidence audit')
     parser.add_argument('--family', choices=['all', 'overview', 'depth', 'domain'], default='all')
     args = parser.parse_args()
     if args.cpu is not None:
@@ -57,13 +57,16 @@ def main():
         if args.family != 'all' and family != args.family:
             continue
         path = output / family / f'{profile}-d{depth}-p{domain}-s{seed}'
-        required = ('summary.json', 'runs.csv', 'histogram.csv', 'diagnostics.csv', 'timeline.csv', 'depth.csv')
-        if args.resume and all((path / name).is_file() for name in required):
+        audit_cmd = [sys.executable, ROOT / 'tools/verify_study.py', '--study-root', path]
+        reuse = args.resume and path.is_dir() and subprocess.run(
+            list(map(str, audit_cmd)), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+        if reuse:
             print(f'Reusing {path}', flush=True)
         else:
             run_checked([binary, '--profile', profile, '--depth', depth, '--domain', domain,
                          '--seed', seed, '--commands', commands, '--runs', 1 if args.smoke else 3,
                          '--outdir', path])
+            run_checked(audit_cmd, stdout=subprocess.DEVNULL)
         records.append({'family': family, 'profile': profile, 'depth': depth, 'domain': domain,
                         'seed': seed, 'commands': commands, 'runs': 1 if args.smoke else 3,
                         'directory': path.relative_to(output).as_posix()})
