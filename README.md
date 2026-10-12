@@ -2,13 +2,76 @@
 
 **An allocation-free C++23 limit order book and matching engine, verified against an independent reference engine.**
 
+[![C++ verification](https://github.com/michaelbawuah/Ledger/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/michaelbawuah/Ledger/actions/workflows/ci.yml?query=branch%3Amain)
+
+| Throughput | Tail latency | Correctness |
+|---|---|---|
+| **18.74M commands/s** (2.27× STL reference) | **271 ns p99 · 371 ns p99.9** | **100M commands, zero mismatches** |
+
+Core results: 1M-command synthetic replay, seed `20261011`, GCC 13.3
+`-O3 -DNDEBUG -march=native`, CPU 0 on an AMD EPYC 9V74 virtual host.
+Medians of five runs; latency times `process()` only, including clock overhead.
+Correctness uses a separate 100M-command differential stream.
+
+![Core latency distribution and survival tail](docs/figures/study/01-core-distribution.svg)
+
+## What it does
+
+- **Orders:** limit, market, cancel-replace, partial fills, GTC/IOC/FOK, integer tick prices.
+- **Matching:** best price, then FIFO; trades execute at the resting maker's price.
+- **Hot path:** no heap allocation, no locks, no exceptions.
+- **Verification:** independent STL reference, differential testing, binary-feed fuzzing, ASan/UBSan/TSan in CI.
+
+## Build and run
+
+Requires C++23, CMake 3.21+ and Ninja. GoogleTest is optional.
+
+```sh
+cmake --preset release && cmake --build --preset release --parallel
+ctest --preset release
+build/release/ledger_generate --out orders.lob --commands 1000000 --seed 20261011
+build/release/ledger_bench --input orders.lob --runs 5 --outdir bench/results/local
+```
+
+## Design
+
+| Component | Implementation | Cost / boundary |
+|---|---|---|
+| Prices | Positive `int64_t` ticks | Exact comparisons; configured range |
+| Levels | Flat arrays + cached best quotes | O(1) known-price access |
+| FIFO | Intrusive doubly linked slot indices | O(1) append/unlink |
+| IDs | Preallocated open addressing; backward-shift erase | Expected O(1); bounded worst case |
+| Orders | Fixed arena and free list | No heap requests while processing |
+| Best search | Occupancy bitmap | Skips 64 empty prices per word |
+| FOK preflight | Occupied-level bitmap traversal | Skips empty prices; preserves rejection atomicity |
+| Reports | Caller-owned fixed buffer | Capacity checked before mutation |
+| Reference | Maps, lists and ID hash map | Independent readable oracle |
+
+## Core performance
+
+| Engine | Commands/s | p50 | p99 | p99.9 |
+|---|---:|---:|---:|---:|
+| STL reference | 8.25M | 100 ns | 481 ns | 681 ns |
+| Fast cached-linear | 18.67M | 50 ns | 301 ns | 410 ns |
+| Fast bitmap | **18.74M** | **50 ns** | **271 ns** | **371 ns** |
+
+## Deep dive
+
+- [Performance study](docs/performance-study.md): 51 configurations, scaling, tail latency and queue backpressure.
+- [Design and trade-offs](docs/design.md) · [Order and event semantics](docs/semantics.md).
+- [Measurement protocol](docs/study-methodology.md) · [Reproduce and audit the numbers](docs/reproducibility.md).
+- [Synthetic market maker](docs/strategy.md) · [Pre-trade risk policy](docs/risk.md).
+
+<details>
+<summary><strong>Full design, workloads, verification, and reproduction</strong></summary>
+
+## Study coverage
+
 On the fresh synthetic core replay: **18.74M commands/s**, **271 ns p99**, and
 **2.27x reference throughput**. The broader performance study covers **51 workload
 configurations, 612 engine runs, and 28.44 million diagnostic latency samples**.
 Correctness: **100 million commands compared across four engine modes**, with
 identical reports and state checks. Measurements use an AMD EPYC virtual host.
-
-[![C++ verification](https://github.com/michaelbawuah/Ledger/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/michaelbawuah/Ledger/actions/workflows/ci.yml?query=branch%3Amain)
 
 The project includes six deterministic traffic profiles, controlled FOK
 optimization experiments, depth/domain scaling, fill-conditioned latency,
@@ -20,7 +83,7 @@ Start with the [full performance study](docs/performance-study.md),
 [measurement protocol](docs/study-methodology.md), or
 [raw experiment matrix](bench/results/study/experiment-matrix-all.json).
 
-## Build and run
+## Additional build and run examples
 
 Requires a C++23 compiler, CMake 3.21+ and Ninja. GoogleTest is used when installed;
 the identical named semantic cases also run through a dependency-free harness.
@@ -267,5 +330,7 @@ The implementation is original; the two supplied projects informed the design:
 [brprojects/Limit-Order-Book](https://github.com/brprojects/Limit-Order-Book) and
 [jxm35/LimitOrderBook-MatchingEngine](https://github.com/jxm35/LimitOrderBook-MatchingEngine).
 Attribution and measurement boundaries: [references.md](docs/references.md).
+
+</details>
 
 [MIT license](LICENSE) · Michael Baffour Awuah
