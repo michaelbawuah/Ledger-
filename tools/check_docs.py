@@ -123,11 +123,12 @@ def check_document(path, root):
     path, root = Path(path).resolve(), Path(root).resolve()
     if not path.is_relative_to(root):
         raise ValueError(f"document escapes repository root: {path}")
+    display_path = path.relative_to(root).as_posix()
     issues = []
     text = path.read_text(encoding="utf-8")
     links, reference_issues = document_links(text)
     for line, message in reference_issues:
-        issues.append(f"{path.relative_to(root)}:{line}: {message}")
+        issues.append(f"{display_path}:{line}: {message}")
     for line, target in links:
         parts = urlsplit(target)
         if parts.scheme or parts.netloc:
@@ -136,9 +137,9 @@ def check_document(path, root):
             continue
         resolved = (path.parent / unquote(parts.path)).resolve()
         if not resolved.is_relative_to(root):
-            issues.append(f"{path.relative_to(root)}:{line}: target escapes repository root {target}")
+            issues.append(f"{display_path}:{line}: target escapes repository root {target}")
         elif not resolved.exists():
-            issues.append(f"{path.relative_to(root)}:{line}: missing local target {target}")
+            issues.append(f"{display_path}:{line}: missing local target {target}")
     return sorted(issues)
 
 
