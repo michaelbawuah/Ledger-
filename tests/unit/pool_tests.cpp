@@ -5,12 +5,18 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace {
 using ledger::detail::OrderPool;
 using ledger::detail::Slot;
 using ledger::detail::no_slot;
+
+static_assert(noexcept(std::declval<OrderPool&>().acquire()));
+static_assert(noexcept(std::declval<OrderPool&>().release(Slot{})));
+static_assert(noexcept(std::declval<const OrderPool&>().size()));
 
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
@@ -165,6 +171,35 @@ void seeded_churn_with_independent_ownership() {
     }
 }
 
+void invariant_diagnostics_detect_corruption() {
+    {
+        OrderPool pool{3};
+        pool[0].next = 0;
+        require(!pool.check_invariants(), "free-list self cycle was not detected");
+    }
+    {
+        OrderPool pool{3};
+        pool[2].next = 0;
+        require(!pool.check_invariants(), "multi-node free-list cycle was not detected");
+    }
+    {
+        OrderPool pool{3};
+        pool[0].next = 3;
+        require(!pool.check_invariants(), "out-of-range free-list edge was not detected");
+    }
+    {
+        OrderPool pool{3};
+        pool[1].live = true;
+        require(!pool.check_invariants(), "live slot in the free list was not detected");
+    }
+    {
+        OrderPool pool{3};
+        const auto slot = pool.acquire();
+        pool[slot].live = false;
+        require(!pool.check_invariants(), "slot missing from both ownership sets was not detected");
+    }
+}
+
 template <class Function> void run(const char* name, Function function) {
     function();
     std::cout << "PASS " << name << '\n';
@@ -177,6 +212,7 @@ int main() {
         run("lifo_recycling_and_payload_reset", lifo_recycling_and_payload_reset);
         run("exhaustive_release_permutations", exhaustive_release_permutations);
         run("seeded_churn_with_independent_ownership", seeded_churn_with_independent_ownership);
+        run("invariant_diagnostics_detect_corruption", invariant_diagnostics_detect_corruption);
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL pool suite: " << error.what() << '\n';
