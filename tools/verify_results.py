@@ -4,7 +4,7 @@ import csv
 import json
 import re
 from collections import defaultdict
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from pathlib import Path
 
 
@@ -57,6 +57,7 @@ def positive_decimal(value, name):
             f"{name}: expected a number")
     number = Decimal(value)
     require(number.is_finite() and number > 0, f"{name}: expected a finite positive number")
+    require(number <= Decimal(2**64 - 1) * Decimal(10**9), f"{name}: exceeds uint64 command/time bounds")
     return number
 
 
@@ -179,3 +180,53 @@ def read_histograms(path, summary, runs):
                     f"{key}: {field} differs from exact frequencies")
         require(max(histogram) == runs[key]["max_ns"], f"{key}: maximum differs from exact frequencies")
     return dict(histograms)
+
+
+def upper_median(values):
+    """Mirror the C++ reporter's sorted[n/2], including even run counts."""
+    require(bool(values), "median: empty sequence")
+    return sorted(values)[len(values) // 2]
+
+
+def close_decimal(actual, expected, name):
+    # The C++ stream records 12 significant figures, so allow serialization
+    # rounding only; this is not a measurement error or confidence tolerance.
+    with localcontext() as context:
+        context.prec = 80
+        tolerance = max(abs(expected) * Decimal("1e-10"), Decimal("0.000001"))
+        require(abs(actual - expected) <= tolerance, f"{name}: inconsistent numeric value")
+
+
+def verify_metrics(summary, runs):
+    with localcontext() as context:
+        context.prec = 80
+        for key, values in runs.items():
+            expected_rate = Decimal(values["commands"]) * 10**9 / values["throughput_total_ns"]
+            close_decimal(values["commands_per_second"], expected_rate, f"{key}.commands_per_second")
+            for field in ("p50_ns", "p99_ns", "p999_ns", "max_ns"):
+                require(values[field] > 0, f"{key}.{field}: latency metric must be positive")
+        for engine in sorted(ENGINES):
+            selected = [values for (candidate, _), values in runs.items() if candidate == engine]
+            metrics = summary["engines"][engine]
+            rate = upper_median([value["commands_per_second"] for value in selected])
+            close_decimal(Decimal(metrics["median_commands_per_second"]), rate, f"{engine}.median throughput")
+            for metric, field in (("median_p50_ns", "p50_ns"), ("median_p99_ns", "p99_ns"),
+                                  ("median_p999_ns", "p999_ns"), ("median_run_max_ns", "max_ns")):
+                require(metrics[metric] == upper_median([value[field] for value in selected]),
+                        f"{engine}.{metric}: differs from run median")
+            require(metrics["max_ns"] == max(value["max_ns"] for value in selected),
+                    f"{engine}.max_ns: differs from run maximum")
+        engines = summary["engines"]
+        bitmap_rate = Decimal(engines["fast-bitmap"]["median_commands_per_second"])
+        linear_rate = Decimal(engines["fast-linear"]["median_commands_per_second"])
+        reference_rate = Decimal(engines["reference"]["median_commands_per_second"])
+        return {
+            "bitmap_reference_throughput_ratio": bitmap_rate / reference_rate,
+            "bitmap_linear_throughput_improvement_percent": (bitmap_rate / linear_rate - 1) * 100,
+            "bitmap_linear_p99_reduction_percent": (
+                Decimal(engines["fast-linear"]["median_p99_ns"] - engines["fast-bitmap"]["median_p99_ns"])
+                / engines["fast-linear"]["median_p99_ns"] * 100),
+            "bitmap_linear_p999_reduction_percent": (
+                Decimal(engines["fast-linear"]["median_p999_ns"] - engines["fast-bitmap"]["median_p999_ns"])
+                / engines["fast-linear"]["median_p999_ns"] * 100),
+        }

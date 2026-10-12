@@ -44,7 +44,7 @@ def fixture_rows():
     return runs, histogram
 
 
-class SchemaTests(unittest.TestCase):
+class FileFixture(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -63,6 +63,8 @@ class SchemaTests(unittest.TestCase):
             writer.writerows(rows)
         return path
 
+
+class SchemaTests(FileFixture):
     def test_accepts_schema_and_preserves_uint64_checksum(self):
         result = verifier.read_summary(self.write_summary(fixture_summary()))
         self.assertEqual(result["engines"]["reference"]["event_checksum"], 2**64 - 1)
@@ -100,7 +102,7 @@ class SchemaTests(unittest.TestCase):
                 verifier.read_csv(path, verifier.HISTOGRAM_COLUMNS)
 
 
-class FrequencyTests(SchemaTests):
+class FrequencyTests(FileFixture):
     def evidence(self, run_rows=None, hist_rows=None):
         summary = fixture_summary()
         original_runs, original_hist = fixture_rows()
@@ -139,6 +141,46 @@ class FrequencyTests(SchemaTests):
         runs[0]["max_ns"] = 31
         with self.assertRaises(verifier.VerificationError):
             self.evidence(run_rows=runs)
+
+
+class MetricTests(FileFixture):
+    def metrics(self, summary=None, rows=None):
+        summary = fixture_summary() if summary is None else summary
+        original, _ = fixture_rows()
+        runs = verifier.read_runs(self.write_csv("runs.csv", verifier.RUN_COLUMNS,
+                                                original if rows is None else rows), summary)
+        return verifier.verify_metrics(summary, runs)
+
+    def test_recomputes_speedup_ratios(self):
+        report = self.metrics()
+        self.assertEqual(report["bitmap_reference_throughput_ratio"], 1)
+        self.assertEqual(report["bitmap_linear_p99_reduction_percent"], 0)
+
+    def test_upper_median_matches_cpp_for_even_run_count(self):
+        self.assertEqual(verifier.upper_median([1, 4, 3, 2]), 3)
+
+    def test_rejects_throughput_and_summary_median_tampering(self):
+        rows, _ = fixture_rows()
+        rows[0]["commands_per_second"] = 1000100
+        with self.assertRaises(verifier.VerificationError):
+            self.metrics(rows=rows)
+        value = fixture_summary()
+        value["engines"]["reference"]["median_p99_ns"] = 11
+        with self.assertRaises(verifier.VerificationError):
+            self.metrics(summary=value)
+
+    def test_rejects_zero_nonfinite_and_exponent_overflow_metrics(self):
+        for replacement in ("0", "NaN", "Infinity", "1e999999999"):
+            rows, _ = fixture_rows()
+            rows[0]["commands_per_second"] = replacement
+            with self.assertRaises(verifier.VerificationError):
+                self.metrics(rows=rows)
+
+    def test_allows_only_decimal_serialization_rounding(self):
+        rows, _ = fixture_rows()
+        rows[0]["throughput_total_ns"] = 1000003
+        rows[0]["commands_per_second"] = "999997.000009"
+        self.metrics(rows=rows)
 
 
 if __name__ == "__main__":
