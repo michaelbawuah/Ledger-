@@ -8,6 +8,37 @@ DEFINITION = re.compile(r"(?m)^ {0,3}\[([^\]\n]+)\]:[ \t]*(.+)$")
 REFERENCE = re.compile(r"!?\[([^\]\n]+)\](?:\[([^\]\n]*)\])?")
 
 
+def mask_region(text):
+    return "".join("\n" if character == "\n" else " " for character in text)
+
+
+def prose_only(text):
+    """Hide code examples/comments while preserving source line numbers."""
+    lines = text.splitlines(keepends=True)
+    fence = None
+    result = []
+    for line in lines:
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line.rstrip("\r\n"))
+        if fence is not None:
+            result.append(mask_region(line))
+            if marker and marker.group(1)[0] == fence[0] and len(marker.group(1)) >= fence[1] \
+                    and not marker.group(2).strip():
+                fence = None
+            continue
+        if marker:
+            fence = (marker.group(1)[0], len(marker.group(1)))
+            result.append(mask_region(line))
+        elif line.startswith("    ") or line.startswith("\t"):
+            result.append(mask_region(line))
+        else:
+            result.append(line)
+    body = "".join(result)
+    body = re.sub(r"<!--[\s\S]*?-->", lambda match: mask_region(match.group()), body)
+    body = re.sub(r"(`+)([\s\S]*?)\1", lambda match: mask_region(match.group()), body)
+    body = re.sub(r"\\[\[\]]", "  ", body)
+    return body
+
+
 def destination(content):
     """Extract a destination, preserving spaces in angle-bracket destinations."""
     content = content.strip()
@@ -58,6 +89,7 @@ def reference_label(text):
 
 def document_links(text):
     """Resolve full/collapsed/shortcut references alongside inline links."""
+    text = prose_only(text)
     definitions = {}
     issues = []
     masked = list(text)

@@ -40,6 +40,26 @@ class ReferenceAndBoundaryTests(DocumentFixture):
                              "[Data File]: <../data file.csv>\n")
         self.assertEqual(checker.check_document(path, self.root), [])
 
+
+class CodeExampleTests(DocumentFixture):
+    def test_ignores_fenced_and_indented_markdown_examples(self):
+        path = self.document("```markdown\n[Example](placeholder.md)\n```\n"
+                             "~~~~markdown\n![Example](placeholder.png)\n~~~\n~~~~\n"
+                             "    [Indented](placeholder.md)\n\t[Tabbed](placeholder.md)\n")
+        self.assertEqual(checker.check_document(path, self.root), [])
+
+    def test_ignores_inline_code_comments_and_escaped_labels(self):
+        path = self.document("`[Example](placeholder.md)`\n``![Example](placeholder.png)``\n"
+                             "<!-- [Hidden](placeholder.md) -->\n\\[Escaped](placeholder.md)\n")
+        self.assertEqual(checker.check_document(path, self.root), [])
+
+    def test_preserves_real_link_line_number_after_multiline_examples(self):
+        path = self.document("```markdown\n[Example](placeholder.md)\n```\n"
+                             "<!--\n[Hidden](placeholder.md)\n-->\n[Real](missing.md)\n")
+        issues = checker.check_document(path, self.root)
+        self.assertEqual(len(issues), 1)
+        self.assertIn("docs/readme.md:7:", issues[0])
+
     def test_reports_undefined_and_duplicate_definitions(self):
         path = self.document("[Full][missing]\n[Repeat]: ../LICENSE\n[repeat]: ../LICENSE\n")
         issues = checker.check_document(path, self.root)
