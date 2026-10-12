@@ -1,0 +1,518 @@
+{
+  "schema_version": 1,
+  "smoke": false,
+  "affinity_cpu": 0,
+  "binary_sha256": "0f2e5a647295388833f451bdeb42422a9b870b77d2ae8698910010db669cadbe",
+  "cells": [
+    {
+      "family": "overview",
+      "profile": "balanced",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261011,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/balanced-d256-p20000-s20261011"
+    },
+    {
+      "family": "overview",
+      "profile": "balanced",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261012,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/balanced-d256-p20000-s20261012"
+    },
+    {
+      "family": "overview",
+      "profile": "balanced",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261013,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/balanced-d256-p20000-s20261013"
+    },
+    {
+      "family": "overview",
+      "profile": "cancel_heavy",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261011,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/cancel_heavy-d256-p20000-s20261011"
+    },
+    {
+      "family": "overview",
+      "profile": "cancel_heavy",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261012,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/cancel_heavy-d256-p20000-s20261012"
+    },
+    {
+      "family": "overview",
+      "profile": "cancel_heavy",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261013,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/cancel_heavy-d256-p20000-s20261013"
+    },
+    {
+      "family": "overview",
+      "profile": "trade_storm",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261011,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/trade_storm-d256-p20000-s20261011"
+    },
+    {
+      "family": "overview",
+      "profile": "trade_storm",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261012,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/trade_storm-d256-p20000-s20261012"
+    },
+    {
+      "family": "overview",
+      "profile": "trade_storm",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261013,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/trade_storm-d256-p20000-s20261013"
+    },
+    {
+      "family": "overview",
+      "profile": "replace_heavy",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261011,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/replace_heavy-d256-p20000-s20261011"
+    },
+    {
+      "family": "overview",
+      "profile": "replace_heavy",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261012,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/replace_heavy-d256-p20000-s20261012"
+    },
+    {
+      "family": "overview",
+      "profile": "replace_heavy",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261013,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/replace_heavy-d256-p20000-s20261013"
+    },
+    {
+      "family": "overview",
+      "profile": "sparse_fok",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261011,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/sparse_fok-d256-p20000-s20261011"
+    },
+    {
+      "family": "overview",
+      "profile": "sparse_fok",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261012,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/sparse_fok-d256-p20000-s20261012"
+    },
+    {
+      "family": "overview",
+      "profile": "sparse_fok",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261013,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/sparse_fok-d256-p20000-s20261013"
+    },
+    {
+      "family": "overview",
+      "profile": "rejection_stress",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261011,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/rejection_stress-d256-p20000-s20261011"
+    },
+    {
+      "family": "overview",
+      "profile": "rejection_stress",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261012,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/rejection_stress-d256-p20000-s20261012"
+    },
+    {
+      "family": "overview",
+      "profile": "rejection_stress",
+      "depth": 256,
+      "domain": 20000,
+      "seed": 20261013,
+      "commands": 100000,
+      "runs": 3,
+      "directory": "overview/rejection_stress-d256-p20000-s20261013"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 64,
+      "domain": 65536,
+      "seed": 20261011,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d64-p65536-s20261011"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 64,
+      "domain": 65536,
+      "seed": 20261012,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d64-p65536-s20261012"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 64,
+      "domain": 65536,
+      "seed": 20261013,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d64-p65536-s20261013"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 256,
+      "domain": 65536,
+      "seed": 20261011,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d256-p65536-s20261011"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 256,
+      "domain": 65536,
+      "seed": 20261012,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d256-p65536-s20261012"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 256,
+      "domain": 65536,
+      "seed": 20261013,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d256-p65536-s20261013"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 1024,
+      "domain": 65536,
+      "seed": 20261011,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d1024-p65536-s20261011"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 1024,
+      "domain": 65536,
+      "seed": 20261012,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d1024-p65536-s20261012"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 1024,
+      "domain": 65536,
+      "seed": 20261013,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d1024-p65536-s20261013"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 4096,
+      "domain": 65536,
+      "seed": 20261011,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d4096-p65536-s20261011"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 4096,
+      "domain": 65536,
+      "seed": 20261012,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d4096-p65536-s20261012"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 4096,
+      "domain": 65536,
+      "seed": 20261013,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d4096-p65536-s20261013"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 16384,
+      "domain": 65536,
+      "seed": 20261011,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d16384-p65536-s20261011"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 16384,
+      "domain": 65536,
+      "seed": 20261012,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d16384-p65536-s20261012"
+    },
+    {
+      "family": "depth",
+      "profile": "balanced",
+      "depth": 16384,
+      "domain": 65536,
+      "seed": 20261013,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "depth/balanced-d16384-p65536-s20261013"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 1024,
+      "seed": 20261011,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p1024-s20261011"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 1024,
+      "seed": 20261012,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p1024-s20261012"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 1024,
+      "seed": 20261013,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p1024-s20261013"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 4096,
+      "seed": 20261011,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p4096-s20261011"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 4096,
+      "seed": 20261012,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p4096-s20261012"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 4096,
+      "seed": 20261013,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p4096-s20261013"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 16384,
+      "seed": 20261011,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p16384-s20261011"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 16384,
+      "seed": 20261012,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p16384-s20261012"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 16384,
+      "seed": 20261013,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p16384-s20261013"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 65536,
+      "seed": 20261011,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p65536-s20261011"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 65536,
+      "seed": 20261012,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p65536-s20261012"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 65536,
+      "seed": 20261013,
+      "commands": 20000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p65536-s20261013"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 262144,
+      "seed": 20261011,
+      "commands": 5000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p262144-s20261011"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 262144,
+      "seed": 20261012,
+      "commands": 5000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p262144-s20261012"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 262144,
+      "seed": 20261013,
+      "commands": 5000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p262144-s20261013"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 1000000,
+      "seed": 20261011,
+      "commands": 5000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p1000000-s20261011"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 1000000,
+      "seed": 20261012,
+      "commands": 5000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p1000000-s20261012"
+    },
+    {
+      "family": "domain",
+      "profile": "sparse_fok",
+      "depth": 64,
+      "domain": 1000000,
+      "seed": 20261013,
+      "commands": 5000,
+      "runs": 3,
+      "directory": "domain/sparse_fok-d64-p1000000-s20261013"
+    }
+  ]
+}

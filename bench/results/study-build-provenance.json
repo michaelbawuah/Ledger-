@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "source_tree_sha": "b3b55cb30675f723bdd326b631a979768a9f26c5",
+  "source_blobs": {
+    "CMakeLists.txt": "d650e7aa661760dab1aca66fce7b5b411f512d28",
+    "CMakePresets.json": "9b11964ecef4bd77d397e62ee8a8be420fd49947",
+    "bench/bench_replay.cpp": "12e50474db1c5247028cc0d311afbef65716bd6d",
+    "bench/bench_spsc.cpp": "4b2a2bf5cb63f3475de3ec0f29779b776d832c39",
+    "bench/bench_study.cpp": "cfce9ea05f666f984c97743980920ba1cd5d1931",
+    "bench/gen_orders.cpp": "8bc6033f6be162c8c9d6038c5a4245dd168e75ac",
+    "include/ledger/book.hpp": "1ea6456fd20a88d0eac164636b18e0d12c4234d9",
+    "include/ledger/feed.hpp": "5b2ac1bf7db68bf21b01ecd07809f8b021ff2583",
+    "include/ledger/feed_view.hpp": "d4b3b55d6d23379f2cfc0c20219f143f0c0a0ccb",
+    "include/ledger/id_index.hpp": "1fd8e7cf6eb9fd2198d58f2d9d49430d165e84c5",
+    "include/ledger/pool.hpp": "adaab3aa3dbe602fa72785aa8ed262ccc08a1b41",
+    "include/ledger/reference_book.hpp": "2c70c42223233e000e0c6acab9b4be0a8475c934",
+    "include/ledger/risk.hpp": "3718bf9bb237aa960b2b982c51535c51e954802d",
+    "include/ledger/spsc_queue.hpp": "e13d536806705a4d207c0cf48c00c0061e92fa0a",
+    "include/ledger/study_observer.hpp": "af2efd32e2184d8de7e361af4d97fe08ef35d2aa",
+    "include/ledger/study_workloads.hpp": "1d3562310d5cc6c7ec00ebe6422ae1dd63216185",
+    "include/ledger/types.hpp": "7072d495d8f315134bb18799e049205eee568baf",
+    "include/ledger/workload.hpp": "81f7742c43c7be15e83dc71062b9ae6d8a51195f",
+    "src/book.cpp": "83c2ee180f48329920a62242d6fdab4807fc54ec",
+    "src/feed.cpp": "08e3adb383cbf3d0d78ffea152d9b29ca76ef22a",
+    "src/feed_view.cpp": "e2dccd674ff8de3f01ecfae499486578f13c1c82",
+    "src/market_maker.cpp": "ad65e9a84db902a682872c8f8dc3dee3707ec6ec",
+    "src/reference_book.cpp": "f884315c8cd3e152c07a76bbf3d1bdf72fca056f",
+    "src/replay.cpp": "8b303ee2401c6b29e941c460f9f81dd6092bf3d3",
+    "src/study_workloads.cpp": "c0dce5d7d23c276da1e8664261c560b9131c48c5"
+  },
+  "capture_date_utc": "2026-10-12",
+  "core_cpu": 0,
+  "study_cpu": 0,
+  "queue_producer_cpu": 1,
+  "queue_consumer_cpu": 2,
+  "note": "Source blob hashes survive connector commit replay. Source-tree hash precedes result and documentation commits. Capture commands in performance-study.md.",
+  "capture_notes": [
+    "Two cells were repeated because their runs.csv and timeline.csv were empty: overview replace_heavy seed20261013 and domain65536 sparse_fok seed20261012. The entire cells were replaced with fresh serial captures, without selecting a latency or throughput threshold. All retained files pass the independent audit."
+  ]
+}
