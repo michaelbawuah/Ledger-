@@ -93,15 +93,46 @@ void quantity_limits() {
             command.quantity = 0;
             expect(policy, command, RiskReject::InvalidQuantity);
             command.quantity = 1;
-            expect(policy, command, RiskReject::None);
+            expect(policy, command, RiskReject::None, {0, 100});
             command.quantity = 12;
-            expect(policy, command, RiskReject::None);
+            expect(policy, command, RiskReject::None, {0, 100});
             command.quantity = 13;
             expect(policy, command, RiskReject::OrderQuantityLimit);
             command.quantity = std::numeric_limits<Quantity>::max();
             expect(policy, command, RiskReject::OrderQuantityLimit);
         }
     }
+}
+
+void integer_price_band() {
+    using namespace ledger;
+    RiskConfig config{};
+    config.min_price = 95;
+    config.max_price = 105;
+    const RiskPolicy policy(config);
+    auto command = limit_order();
+    for (const auto price : {Price{0}, Price{-1}, std::numeric_limits<Price>::min()}) {
+        command.price = price;
+        expect(policy, command, RiskReject::InvalidPrice);
+    }
+    for (const auto price : {Price{94}, Price{106}, std::numeric_limits<Price>::max()}) {
+        command.price = price;
+        expect(policy, command, RiskReject::PriceBand);
+    }
+    for (const auto price : {Price{95}, Price{105}}) {
+        command.price = price;
+        expect(policy, command, RiskReject::None);
+        require(policy.evaluate(command).valuation_price == price, "limit valuation differs");
+    }
+    command.action = Action::Market;
+    command.price = std::numeric_limits<Price>::min(); // Market price comes only from context.
+    expect(policy, command, RiskReject::MissingMarketValuation);
+    expect(policy, command, RiskReject::MissingMarketValuation, {0, -1});
+    expect(policy, command, RiskReject::PriceBand, {0, 94});
+    expect(policy, command, RiskReject::None, {0, 95});
+    expect(policy, command, RiskReject::None, {0, 105});
+    expect(policy, command, RiskReject::PriceBand, {0, 106});
+    require(policy.evaluate(command, {0, 105}).valuation_price == 105, "market valuation differs");
 }
 } // namespace
 
@@ -110,7 +141,8 @@ int main() {
         configuration_validation();
         command_envelope();
         quantity_limits();
-        std::cout << "PASS risk configuration, command envelope, and quantity limits\n";
+        integer_price_band();
+        std::cout << "PASS risk configuration, envelope, quantity, and integer price band\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL " << error.what() << '\n';

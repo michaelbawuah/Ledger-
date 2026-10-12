@@ -25,6 +25,7 @@ struct RiskContext {
 enum class RiskReject : std::uint8_t {
     None, InvalidAction, InvalidSide, InvalidTimeInForce, InvalidId,
     InvalidQuantity, OrderQuantityLimit,
+    MissingMarketValuation, InvalidPrice, PriceBand,
 };
 
 struct RiskDecision {
@@ -59,7 +60,12 @@ public:
         if (command.action == Action::Cancel) return {RiskReject::None, context.position};
         if (command.quantity == 0) return {RiskReject::InvalidQuantity};
         if (command.quantity > config_.max_order_quantity) return {RiskReject::OrderQuantityLimit};
-        return {RiskReject::None, context.position};
+        const bool market = command.action == Action::Market;
+        const Price valuation = market ? context.market_valuation_price : command.price;
+        if (market && valuation <= 0) return {RiskReject::MissingMarketValuation};
+        if (valuation <= 0) return {RiskReject::InvalidPrice};
+        if (valuation < config_.min_price || valuation > config_.max_price) return {RiskReject::PriceBand};
+        return {RiskReject::None, context.position, valuation};
     }
 
 private:
