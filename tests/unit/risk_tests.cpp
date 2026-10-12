@@ -1,10 +1,14 @@
 #include "ledger/risk.hpp"
 #include <iostream>
+#include <random>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 namespace {
+std::size_t assertions{};
 void require(bool condition, const char* message) {
+    ++assertions;
     if (!condition) throw std::runtime_error(message);
 }
 
@@ -257,6 +261,75 @@ void cancel_and_conservative_replace() {
             rejected.valuation_price == 0 && rejected.order_notional == 0,
             "rejected decision leaked a partially assessed exposure");
 }
+
+void exhaustive_enums_and_decision_priority() {
+    using namespace ledger;
+    static_assert(std::is_trivially_copyable_v<RiskDecision>);
+    const RiskPolicy policy;
+    for (unsigned value = 0; value < 256; ++value) {
+        auto command = limit_order();
+        command.side = static_cast<Side>(value);
+        expect(policy, command, value <= 1 ? RiskReject::None : RiskReject::InvalidSide);
+        command = limit_order();
+        command.tif = static_cast<TimeInForce>(value);
+        expect(policy, command, value <= 2 ? RiskReject::None : RiskReject::InvalidTimeInForce);
+        command = limit_order();
+        command.action = static_cast<Action>(value);
+        expect(policy, command, value <= 3 ? RiskReject::None : RiskReject::InvalidAction, {0, 100});
+    }
+    auto invalid = limit_order();
+    invalid.action = static_cast<Action>(4);
+    invalid.side = static_cast<Side>(2);
+    invalid.tif = static_cast<TimeInForce>(3);
+    invalid.id = 0;
+    invalid.quantity = 0;
+    invalid.price = 0;
+    expect(policy, invalid, RiskReject::InvalidAction);
+    invalid.action = Action::Limit;
+    expect(policy, invalid, RiskReject::InvalidSide);
+    invalid.side = Side::Buy;
+    expect(policy, invalid, RiskReject::InvalidTimeInForce);
+    invalid.tif = TimeInForce::GTC;
+    expect(policy, invalid, RiskReject::InvalidId);
+    invalid.id = std::numeric_limits<OrderId>::max();
+    expect(policy, invalid, RiskReject::InvalidQuantity);
+    invalid.quantity = 1;
+    expect(policy, invalid, RiskReject::InvalidPrice);
+}
+
+void bounded_arithmetic_grid() {
+    using namespace ledger;
+    RiskConfig config{};
+    config.max_abs_inventory = 100;
+    const RiskPolicy policy(config);
+    for (std::int64_t position = -120; position <= 120; ++position) {
+        for (Quantity quantity = 1; quantity <= 40; ++quantity) {
+            for (const auto side : {Side::Buy, Side::Sell}) {
+                auto command = limit_order();
+                command.side = side;
+                command.quantity = quantity;
+                const auto expected_position = position +
+                    (side == Side::Buy ? std::int64_t{quantity} : -std::int64_t{quantity});
+                const bool allowed = expected_position >= -100 && expected_position <= 100;
+                const auto decision = policy.evaluate(command, {position, 0});
+                require(decision.approved() == allowed, "bounded inventory grid decision differs");
+                if (allowed) require(decision.projected_inventory == expected_position,
+                                     "bounded inventory grid projection differs");
+            }
+        }
+    }
+    config.max_order_notional = 10'000;
+    const RiskPolicy budget(config);
+    std::mt19937 random(91);
+    for (std::size_t index = 0; index < 10'000; ++index) {
+        auto command = limit_order();
+        command.quantity = static_cast<Quantity>(random() % 100 + 1);
+        command.price = static_cast<Price>(random() % 500 + 1);
+        const auto safe_product = static_cast<std::uint64_t>(command.price) * command.quantity;
+        expect(budget, command, safe_product <= config.max_order_notional ?
+               RiskReject::None : RiskReject::OrderNotionalLimit);
+    }
+}
 } // namespace
 
 int main() {
@@ -268,7 +341,10 @@ int main() {
         notional_without_overflow();
         projected_inventory_limits();
         cancel_and_conservative_replace();
-        std::cout << "PASS risk boundaries, cancellation, and conservative replacement\n";
+        exhaustive_enums_and_decision_priority();
+        bounded_arithmetic_grid();
+        std::cout << "PASS " << assertions << " risk assertions: boundaries, exhaustive enums, "
+                     "19280 inventory cases, and 10000 seeded notional cases\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL " << error.what() << '\n';
