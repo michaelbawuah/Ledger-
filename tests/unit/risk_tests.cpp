@@ -79,13 +79,38 @@ void command_envelope() {
     command.action = Action::Cancel;
     expect(policy, command, RiskReject::None);
 }
+
+void quantity_limits() {
+    using namespace ledger;
+    RiskConfig config{};
+    config.max_order_quantity = 12;
+    const RiskPolicy policy(config);
+    for (const auto side : {Side::Buy, Side::Sell}) {
+        for (const auto action : {Action::Limit, Action::Market, Action::Replace}) {
+            auto command = limit_order();
+            command.side = side;
+            command.action = action;
+            command.quantity = 0;
+            expect(policy, command, RiskReject::InvalidQuantity);
+            command.quantity = 1;
+            expect(policy, command, RiskReject::None);
+            command.quantity = 12;
+            expect(policy, command, RiskReject::None);
+            command.quantity = 13;
+            expect(policy, command, RiskReject::OrderQuantityLimit);
+            command.quantity = std::numeric_limits<Quantity>::max();
+            expect(policy, command, RiskReject::OrderQuantityLimit);
+        }
+    }
+}
 } // namespace
 
 int main() {
     try {
         configuration_validation();
         command_envelope();
-        std::cout << "PASS risk configuration and noexcept command envelope\n";
+        quantity_limits();
+        std::cout << "PASS risk configuration, command envelope, and quantity limits\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL " << error.what() << '\n';

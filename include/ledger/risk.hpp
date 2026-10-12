@@ -24,6 +24,7 @@ struct RiskContext {
 
 enum class RiskReject : std::uint8_t {
     None, InvalidAction, InvalidSide, InvalidTimeInForce, InvalidId,
+    InvalidQuantity, OrderQuantityLimit,
 };
 
 struct RiskDecision {
@@ -56,6 +57,8 @@ public:
         if (command.id == 0) return {RiskReject::InvalidId};
         // A valid cancel must remain possible even when exposure exceeds limits.
         if (command.action == Action::Cancel) return {RiskReject::None, context.position};
+        if (command.quantity == 0) return {RiskReject::InvalidQuantity};
+        if (command.quantity > config_.max_order_quantity) return {RiskReject::OrderQuantityLimit};
         return {RiskReject::None, context.position};
     }
 
