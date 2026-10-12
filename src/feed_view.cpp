@@ -1,5 +1,7 @@
 #include "ledger/feed_view.hpp"
 
+#include <cassert>
+
 namespace ledger {
 
 bool FeedView::parse(std::span<const std::byte> bytes, FeedView& out,
@@ -31,6 +33,17 @@ bool FeedView::read(std::size_t index, Command& out) const noexcept {
     // index < payload.size() / record_size proves both multiplication and the
     // entire record range are representable and within the borrowed span.
     return decode_record(records_.subspan(index * feed_record_size, feed_record_size), out);
+}
+
+Command FeedView::Iterator::operator*() const noexcept {
+    assert(index_ < records_.size() / feed_record_size);
+    Command command{};
+    const auto decoded = decode_record(
+        records_.subspan(index_ * feed_record_size, feed_record_size), command);
+    // Iterator dereference requires live, unchanged storage and a non-end index.
+    assert(decoded);
+    (void)decoded;
+    return command;
 }
 
 }
