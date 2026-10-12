@@ -1,6 +1,8 @@
 #include "ledger/pool.hpp"
 
+#include <array>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 
 namespace {
@@ -34,6 +36,41 @@ void empty_and_exhaustion() {
     }
 }
 
+void lifo_recycling_and_payload_reset() {
+    OrderPool pool{4};
+    std::array<Slot, 4> slots{};
+    for (auto& slot : slots) {
+        slot = pool.acquire();
+        auto& node = pool[slot];
+        node.id = std::numeric_limits<ledger::OrderId>::max();
+        node.price = std::numeric_limits<ledger::Price>::min();
+        node.quantity = std::numeric_limits<ledger::Quantity>::max();
+        node.side = ledger::Side::Sell;
+        node.previous = 2;
+        node.next = 3;
+    }
+    const std::array<Slot, 4> release_order{1, 3, 0, 2};
+    for (const auto slot : release_order) {
+        pool.release(slot);
+        const auto& node = pool[slot];
+        require(!node.live && node.id == 0 && node.price == 0 && node.quantity == 0,
+                "released payload retained order data");
+        require(node.previous == no_slot && node.side == ledger::Side::Buy, "released node metadata reset");
+        require(pool.check_invariants(), "partition after out-of-order release");
+    }
+    require(pool.size() == 0 && !pool.full(), "fully recycled state");
+    for (auto iterator = release_order.rbegin(); iterator != release_order.rend(); ++iterator) {
+        const auto slot = pool.acquire();
+        require(slot == *iterator, "free list must recycle last released first");
+        const auto& node = pool[slot];
+        require(node.live && node.id == 0 && node.price == 0 && node.quantity == 0,
+                "reacquired payload was not cleared");
+        require(node.previous == no_slot && node.next == no_slot && node.side == ledger::Side::Buy,
+                "reacquired intrusive links were not detached");
+        require(pool.check_invariants(), "partition after reacquire");
+    }
+}
+
 template <class Function> void run(const char* name, Function function) {
     function();
     std::cout << "PASS " << name << '\n';
@@ -43,6 +80,7 @@ template <class Function> void run(const char* name, Function function) {
 int main() {
     try {
         run("empty_and_exhaustion", empty_and_exhaustion);
+        run("lifo_recycling_and_payload_reset", lifo_recycling_and_payload_reset);
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL pool suite: " << error.what() << '\n';
