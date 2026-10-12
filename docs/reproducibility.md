@@ -2,7 +2,7 @@
 
 Ledger separates engine correctness, benchmark arithmetic, and measured host
 performance. Re-running one of these checks does not establish the others.
-The recorded [measurement report](results.md) describes the original machine,
+The current [measurement report](results.md) describes the recorded machine,
 compiler, workload, warmup and timing boundaries.
 
 ## Audit the committed evidence
@@ -21,9 +21,9 @@ The scripts also work from another working directory when invoked by their
 absolute paths; their default repository paths are relative to the scripts.
 
 [verify_results.py](../tools/verify_results.py) reads the core
-[summary](../bench/results/core/summary.json),
-[individual runs](../bench/results/core/runs.csv), and
-[exact latency frequencies](../bench/results/core/latency_histogram.csv).
+[summary](../bench/results/core-v2/summary.json),
+[individual runs](../bench/results/core-v2/runs.csv), and
+[exact latency frequencies](../bench/results/core-v2/latency_histogram.csv).
 It verifies all three engines and every numbered run, not a selected best run.
 The committed evidence contains 15 engine/run combinations and 15,000,000
 latency samples. Each individual run contains 1,000,000 samples.
@@ -54,8 +54,15 @@ from 1 through 31.
 The JSON printed by the audit recalculates bitmap/reference throughput ratio and
 bitmap/linear throughput and tail-latency changes. Decimal values are serialized
 as strings so their displayed precision is deterministic. With the committed
-evidence, these reproduce approximately 2.1886x throughput, 2.0386% throughput
-improvement, 9.9668% p99 reduction and 7.4813% p99.9 reduction.
+current evidence, these reproduce approximately 2.2711x reference throughput,
+0.3534% bitmap/linear throughput improvement, 9.9668% p99 reduction and 9.5122%
+p99.9 reduction. The rounded headline is 18.74M commands/s, 271 ns p99 and 2.27x
+reference throughput. The small bitmap/linear throughput difference does not
+establish a meaningful throughput advantage on this replay.
+
+The [initial raw packet](../bench/results/core/summary.json) is preserved as a
+historical capture. To audit it explicitly, run
+`python3 tools/verify_results.py bench/results/core`; the default audits core-v2.
 
 This arithmetic audit establishes consistency of the recorded artifacts. It
 does not reconstruct executions from the original commands or prove that a

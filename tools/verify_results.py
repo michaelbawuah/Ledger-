@@ -314,7 +314,7 @@ def verify_directory(directory):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", nargs="?", type=Path,
-                        default=Path(__file__).resolve().parents[1] / "bench/results/core",
+                        default=Path(__file__).resolve().parents[1] / "bench/results/core-v2",
                         help="Directory containing summary.json, runs.csv and latency_histogram.csv")
     args = parser.parse_args(argv)
     try:

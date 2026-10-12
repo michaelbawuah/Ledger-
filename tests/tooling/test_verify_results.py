@@ -251,9 +251,11 @@ class IntegrationTests(FileFixture):
         self.assertNotIn("Traceback", process.stderr)
 
     def test_committed_core_evidence_is_consistent(self):
-        report = verifier.verify_directory(SCRIPT.parents[1] / "bench/results/core")
-        self.assertEqual(report["verified_engine_runs"], 15)
-        self.assertEqual(report["verified_latency_samples"], 15000000)
+        for packet in ("core-v2", "core"):
+            with self.subTest(packet=packet):
+                report = verifier.verify_directory(SCRIPT.parents[1] / "bench/results" / packet)
+                self.assertEqual(report["verified_engine_runs"], 15)
+                self.assertEqual(report["verified_latency_samples"], 15000000)
 
 
 class ReplayMetadataTests(FileFixture):

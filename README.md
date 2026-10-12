@@ -8,7 +8,7 @@ configurations, 612 engine runs, and 28.44 million diagnostic latency samples**.
 Correctness: **100 million commands compared across four engine modes**, with
 identical reports and state checks. Measurements use an AMD EPYC virtual host.
 
-[![C++ verification](https://github.com/michaelbawuah/Ledger-/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelbawuah/Ledger-/actions/workflows/ci.yml)
+[![C++ verification](https://github.com/michaelbawuah/Ledger/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/michaelbawuah/Ledger/actions/workflows/ci.yml?query=branch%3Amain)
 
 The project includes six deterministic traffic profiles, controlled FOK
 optimization experiments, depth/domain scaling, fill-conditioned latency,
@@ -109,7 +109,9 @@ advantage between the two fast modes.
 
 Fresh [summary](bench/results/core-v2/summary.json), [runs](bench/results/core-v2/runs.csv)
 and [exact latency frequencies](bench/results/core-v2/latency_histogram.csv) are
-committed. The [initial evidence](docs/results.md) remains available separately.
+committed. The [measurement report](docs/results.md) uses this same current
+packet; the [initial raw evidence](bench/results/core/summary.json) remains
+archived separately.
 
 ## Performance across workloads
 
@@ -217,7 +219,7 @@ mkdir -p build/corpus
 build/fuzz/ledger_parser_fuzz build/corpus -max_total_time=30
 ```
 
-The `fuzz` preset requires Clang. [GitHub Actions](https://github.com/michaelbawuah/Ledger-/actions)
+The `fuzz` preset requires Clang. [GitHub Actions](https://github.com/michaelbawuah/Ledger/actions)
 checks GCC/Clang, ASan/UBSan, parser fuzzing, TSan, macOS/Windows builds, and
 reproduces and audits the study figures from committed raw evidence.
 
