@@ -9,7 +9,7 @@ an AMD EPYC virtual host, not live-exchange or network latency.
 
 ## Build and run
 
-Requires a C++23 compiler, CMake 3.20+ and Ninja. GoogleTest is used when installed;
+Requires a C++23 compiler, CMake 3.21+ and Ninja. GoogleTest is used when installed;
 the identical named semantic cases also run through a dependency-free harness.
 
 ```sh
