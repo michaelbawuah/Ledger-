@@ -255,5 +255,41 @@ class IntegrationTests(FileFixture):
         self.assertEqual(report["verified_engine_runs"], 15)
         self.assertEqual(report["verified_latency_samples"], 15000000)
 
+
+class ReplayMetadataTests(FileFixture):
+    def test_input_replay_accepts_null_generator_metadata(self):
+        summary = fixture_summary()
+        summary["input"] = "recorded feed.lob"
+        for key in ("seed", "generated_peak_live_orders", "generated_empty_book_cancels",
+                    "generated_capacity_ioc_limits"):
+            summary[key] = None
+        loaded = verifier.read_summary(self.write_summary(summary))
+        rows, _ = fixture_rows()
+        runs = verifier.read_runs(self.write_csv("runs.csv", verifier.RUN_COLUMNS, rows), loaded)
+        verifier.verify_accounting(loaded, runs)
+
+    def test_rejects_mixed_replay_and_generator_metadata(self):
+        for input_path in (None, "recorded.lob"):
+            summary = fixture_summary()
+            summary["input"] = input_path
+            if input_path is None:
+                summary["seed"] = None
+            with self.assertRaises(verifier.VerificationError):
+                verifier.read_summary(self.write_summary(summary))
+
+    def test_bounds_run_sets_and_configuration_before_allocating_them(self):
+        for key, replacement, message in (("runs", 2**64 - 1, "odd count"),
+                                           ("runs", 2, "odd count"),
+                                           ("commands", 5_000_001, "command limit")):
+            summary = fixture_summary()
+            summary[key] = replacement
+            with self.assertRaisesRegex(verifier.VerificationError, message):
+                verifier.read_summary(self.write_summary(summary))
+        for field, replacement in (("max_orders", 1_000_001), ("max_price", 1_000_001)):
+            summary = fixture_summary()
+            summary["config"][field] = replacement
+            with self.assertRaises(verifier.VerificationError):
+                verifier.read_summary(self.write_summary(summary))
+
 if __name__ == "__main__":
     unittest.main()

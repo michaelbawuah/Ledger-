@@ -86,15 +86,30 @@ def read_summary(path):
             "summary: unsupported schema_version")
     for key in ("commands", "runs"):
         integer(summary[key], key, 1)
-    for key in ("seed", "warmup_commands", "generated_peak_live_orders",
-                "generated_empty_book_cancels", "generated_capacity_ioc_limits"):
-        integer(summary[key], key)
+    require(summary["commands"] <= 5_000_000, "commands: exceeds benchmark's 5000000-command limit")
+    require(summary["runs"] <= 31 and summary["runs"] % 2 == 1,
+            "runs: benchmark requires an odd count in [1, 31]")
     require(summary["input"] is None or isinstance(summary["input"], str), "input: expected string or null")
+    generated_fields = ("seed", "generated_peak_live_orders", "generated_empty_book_cancels",
+                        "generated_capacity_ioc_limits")
+    if summary["input"] is None:
+        for key in generated_fields:
+            integer(summary[key], key)
+    else:
+        require(bool(summary["input"]), "input: expected a nonempty feed path")
+        for key in generated_fields:
+            require(summary[key] is None, f"{key}: input replay requires null generator metadata")
+    integer(summary["warmup_commands"], "warmup_commands")
+    require(summary["warmup_commands"] <= summary["commands"], "warmup_commands: exceeds measured stream size")
     require(isinstance(summary["method"], str) and bool(summary["method"]), "method: expected nonempty text")
     exact_keys(summary["config"], {"min_price", "max_price", "max_orders"}, "config")
     for key in summary["config"]:
         integer(summary["config"][key], f"config.{key}", 1)
     require(summary["config"]["min_price"] <= summary["config"]["max_price"], "config: inverted price range")
+    require(summary["config"]["max_price"] <= 2**63 - 1, "config: price exceeds signed int64 range")
+    require(summary["config"]["max_price"] - summary["config"]["min_price"] <= 999_999,
+            "config: price domain exceeds 1000000 ticks")
+    require(summary["config"]["max_orders"] <= 1_000_000, "config: capacity exceeds 1000000 orders")
     exact_keys(summary["mix"], {"limit", "cancel", "market", "replace"}, "mix")
     for key, value in summary["mix"].items():
         integer(value, f"mix.{key}")
@@ -264,12 +279,16 @@ def verify_accounting(summary, runs):
     for engine, metrics in summary["engines"].items():
         require(metrics["rejected_commands"] <= summary["commands"], f"{engine}: rejects exceed commands")
         require(metrics["trades"] <= metrics["events"], f"{engine}: trades exceed events")
-        require(metrics["live_orders_final"] <= summary["generated_peak_live_orders"],
-                f"{engine}: final live orders exceed generated peak")
+        require(metrics["live_orders_final"] <= summary["config"]["max_orders"],
+                f"{engine}: final live orders exceed configured capacity")
+        if summary["input"] is None:
+            require(metrics["live_orders_final"] <= summary["generated_peak_live_orders"],
+                    f"{engine}: final live orders exceed generated peak")
         for field in (*fields, "live_orders_final"):
             require(metrics[field] == reference[field], f"{engine}.{field}: differs from reference")
-    require(summary["generated_peak_live_orders"] <= summary["config"]["max_orders"],
-            "generated peak live orders exceed configured capacity")
+    if summary["input"] is None:
+        require(summary["generated_peak_live_orders"] <= summary["config"]["max_orders"],
+                "generated peak live orders exceed configured capacity")
     for key, values in runs.items():
         engine = key[0]
         for field in fields:
