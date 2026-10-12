@@ -111,6 +111,60 @@ void exhaustive_release_permutations() {
     }
 }
 
+std::uint64_t random_step(std::uint64_t& state) noexcept {
+    state ^= state << 13;
+    state ^= state >> 7;
+    state ^= state << 17;
+    return state;
+}
+
+void seeded_churn_with_independent_ownership() {
+    for (const auto capacity : {1U, 3U, 64U, 257U}) {
+        OrderPool pool{capacity};
+        std::vector<bool> live(capacity, false);
+        std::vector<ledger::OrderId> expected_id(capacity, 0);
+        std::vector<Slot> free_stack;
+        free_stack.reserve(capacity);
+        for (Slot slot = capacity; slot > 0; --slot) free_stack.push_back(slot - 1);
+        std::uint64_t random = UINT64_C(0x34823c9a2d571be1) ^ capacity;
+        for (std::uint64_t operation = 1; operation <= 100000; ++operation) {
+            const auto candidate = static_cast<Slot>(random_step(random) % capacity);
+            if (live[candidate]) {
+                pool.release(candidate);
+                live[candidate] = false;
+                expected_id[candidate] = 0;
+                free_stack.push_back(candidate);
+            } else {
+                const auto slot = pool.acquire();
+                require(!free_stack.empty() && slot == free_stack.back(), "churn free stack disagrees");
+                free_stack.pop_back();
+                require(!live[slot], "churn acquired a live slot");
+                live[slot] = true;
+                expected_id[slot] = operation;
+                pool[slot].id = operation;
+                pool[slot].price = static_cast<ledger::Price>(operation * 7);
+                pool[slot].quantity = static_cast<ledger::Quantity>(operation % 251 + 1);
+            }
+            require(pool.size() + free_stack.size() == capacity, "churn cardinality partition");
+            if (operation % 127 == 0) {
+                verify_partition(pool, live);
+                for (Slot slot = 0; slot < capacity; ++slot) {
+                    require(pool[slot].id == expected_id[slot], "churn changed another slot's payload");
+                    if (live[slot]) {
+                        require(pool[slot].price == static_cast<ledger::Price>(expected_id[slot] * 7),
+                                "live price corrupted during churn");
+                        require(pool[slot].quantity == expected_id[slot] % 251 + 1,
+                                "live quantity corrupted during churn");
+                    }
+                }
+            }
+        }
+        verify_partition(pool, live);
+        for (Slot slot = 0; slot < capacity; ++slot) if (live[slot]) pool.release(slot);
+        require(pool.size() == 0 && pool.check_invariants(), "churn final drain");
+    }
+}
+
 template <class Function> void run(const char* name, Function function) {
     function();
     std::cout << "PASS " << name << '\n';
@@ -122,6 +176,7 @@ int main() {
         run("empty_and_exhaustion", empty_and_exhaustion);
         run("lifo_recycling_and_payload_reset", lifo_recycling_and_payload_reset);
         run("exhaustive_release_permutations", exhaustive_release_permutations);
+        run("seeded_churn_with_independent_ownership", seeded_churn_with_independent_ownership);
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL pool suite: " << error.what() << '\n';
