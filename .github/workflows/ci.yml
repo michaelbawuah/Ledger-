@@ -1,0 +1,49 @@
+name: C++ verification
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+        preset: [release, asan]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build libgtest-dev
+      - run: cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} -DLEDGER_REQUIRE_GTEST=ON
+      - run: cmake --build --preset ${{ matrix.preset }} --parallel 2
+      - run: ctest --preset ${{ matrix.preset }}
+  portable:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build/portable -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build/portable --config Release --parallel 2
+      - run: ctest --test-dir build/portable -C Release --output-on-failure
+  parser-fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake --preset fuzz && cmake --build --preset fuzz --parallel 2
+      - run: mkdir -p build/corpus && build/fuzz/ledger_parser_fuzz build/corpus -max_total_time=30 -timeout=5
+  thread-sanitizer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake --preset tsan && cmake --build --preset tsan --target ledger_spsc_tests --parallel 2
+      - run: build/tsan/ledger_spsc_tests
+  long-differential:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake --preset release && cmake --build --preset release --parallel 2
+      - run: build/release/ledger_differential --seeds 100 --orders 1000000

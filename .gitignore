@@ -1,0 +1,7 @@
+/build/
+/tmp/
+*.lob
+__pycache__/
+*.profraw
+*.profdata
+/bench/results/*latencies*.csv

@@ -1,0 +1,25 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {"major": 3, "minor": 20, "patch": 0},
+  "configurePresets": [
+    {"name": "debug", "generator": "Ninja", "binaryDir": "${sourceDir}/build/debug", "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug"}},
+    {"name": "release", "inherits": "debug", "binaryDir": "${sourceDir}/build/release", "cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}},
+    {"name": "native", "inherits": "release", "binaryDir": "${sourceDir}/build/native", "cacheVariables": {"LEDGER_NATIVE": "ON"}},
+    {"name": "asan", "inherits": "debug", "binaryDir": "${sourceDir}/build/asan", "cacheVariables": {"LEDGER_SANITIZER": "address"}},
+    {"name": "tsan", "inherits": "debug", "binaryDir": "${sourceDir}/build/tsan", "cacheVariables": {"LEDGER_SANITIZER": "thread"}},
+    {"name": "fuzz", "inherits": "asan", "binaryDir": "${sourceDir}/build/fuzz", "cacheVariables": {"CMAKE_CXX_COMPILER": "clang++", "LEDGER_FUZZ": "ON", "BUILD_TESTING": "OFF"}}
+  ],
+  "buildPresets": [
+    {"name": "debug", "configurePreset": "debug"},
+    {"name": "release", "configurePreset": "release"},
+    {"name": "native", "configurePreset": "native"},
+    {"name": "asan", "configurePreset": "asan"},
+    {"name": "tsan", "configurePreset": "tsan"},
+    {"name": "fuzz", "configurePreset": "fuzz", "targets": ["ledger_parser_fuzz"]}
+  ],
+  "testPresets": [
+    {"name": "debug", "configurePreset": "debug", "output": {"outputOnFailure": true}},
+    {"name": "release", "configurePreset": "release", "output": {"outputOnFailure": true}},
+    {"name": "asan", "configurePreset": "asan", "output": {"outputOnFailure": true}}
+  ]
+}
