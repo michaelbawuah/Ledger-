@@ -6,10 +6,12 @@
 #include <charconv>
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <random>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 
 namespace {
@@ -30,9 +32,14 @@ public:
         : steps_(steps), seed_(seed), quote_quantity_(quote_quantity), limit_(inventory_limit),
           book_(ledger::Config{1, 20000, 16}), output_(storage_) {}
 
-    void run() {
+    void run(std::ostream* trace = nullptr) {
         using namespace ledger;
         std::mt19937_64 random(seed_);
+        if (trace != nullptr) {
+            *trace << "step,mid_ticks,inventory_units,cash_tick_units,pnl_tick_units,"
+                "maker_filled_units,maker_trade_events,max_abs_inventory_units\n";
+            write_trace(*trace, 0);
+        }
         for (std::uint64_t step = 0; step < steps_; ++step) {
             // All live IDs are tracked from the actual engine execution reports.
             for (OrderId id = 1; id <= 4; ++id) {
@@ -62,11 +69,13 @@ public:
             // the aggressor's direction after execution. No historical feed.
             const auto jump = static_cast<Price>((draw >> 32) % 4);
             mid_ = std::clamp<Price>(mid_ + (buyer ? jump : -jump), 1000, 19000);
+            if (trace != nullptr) write_trace(*trace, step + 1);
         }
         for (ledger::OrderId id = 1; id <= 4; ++id)
             if (remaining_[id] != 0)
                 apply({++sequence_, id, 0, 0, id % 2 == 1 ? ledger::Side::Buy : ledger::Side::Sell,
                        ledger::Action::Cancel, ledger::TimeInForce::GTC});
+        if (trace != nullptr) trace->flush();
         const auto pnl = cash_ + inventory_ * mid_;
         if (max_abs_inventory_ > limit_) throw std::runtime_error("inventory limit violated");
         if (maker_buy_units_ - maker_sell_units_ != inventory_)
@@ -97,6 +106,11 @@ public:
             << ",\n  \"flow_units\": " << flow_units_ << "\n}\n";
     }
 private:
+    void write_trace(std::ostream& trace, std::uint64_t step) const {
+        trace << step << ',' << mid_ << ',' << inventory_ << ',' << cash_ << ','
+              << cash_ + inventory_ * mid_ << ',' << maker_filled_units_ << ','
+              << maker_trade_events_ << ',' << max_abs_inventory_ << '\n';
+    }
     static double ratio(std::uint64_t numerator, std::uint64_t denominator) {
         return denominator == 0 ? 0 : static_cast<double>(numerator) / static_cast<double>(denominator);
     }
@@ -153,9 +167,11 @@ int main(int argc, char** argv) {
     try {
         std::uint64_t steps = 10000, seed = 42, quote_quantity = 5, inventory_limit = 20;
         bool seen_steps = false, seen_seed = false, seen_quantity = false, seen_limit = false;
+        bool seen_trace = false;
+        std::string trace_path;
         if (argc == 2 && std::string_view(argv[1]) == "--help") {
             std::cout << "Usage: market_maker [--steps 1..1000000] [--seed uint64] "
-                "[--quote-quantity 1..10000] [--inventory-limit 1..100000]\n";
+                "[--quote-quantity 1..10000] [--inventory-limit 1..100000] [--trace FILE]\n";
             return 0;
         }
         for (int i = 1; i < argc; ++i) {
@@ -165,13 +181,21 @@ int main(int argc, char** argv) {
             else if (option == "--seed" && !seen_seed) { seed = number(argv[++i]); seen_seed = true; }
             else if (option == "--quote-quantity" && !seen_quantity) { quote_quantity = number(argv[++i]); seen_quantity = true; }
             else if (option == "--inventory-limit" && !seen_limit) { inventory_limit = number(argv[++i]); seen_limit = true; }
+            else if (option == "--trace" && !seen_trace) { trace_path = argv[++i]; seen_trace = true; }
             else throw std::invalid_argument("unknown or duplicate option");
         }
         if (steps == 0 || steps > 1000000 || quote_quantity == 0 || quote_quantity > 10000
             || inventory_limit == 0 || inventory_limit > 100000)
             throw std::invalid_argument("option value out of range");
+        std::ofstream trace;
+        if (seen_trace) {
+            if (trace_path.empty()) throw std::invalid_argument("trace path must not be empty");
+            trace.exceptions(std::ios::failbit | std::ios::badbit);
+            trace.open(trace_path);
+        }
         Simulation(steps, seed, static_cast<std::uint32_t>(quote_quantity),
-                   static_cast<std::int64_t>(inventory_limit)).run();
+                   static_cast<std::int64_t>(inventory_limit)).run(seen_trace ? &trace : nullptr);
+        if (seen_trace) trace.close();
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "market_maker: " << error.what() << '\n'; return 2;
