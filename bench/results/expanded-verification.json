@@ -1,0 +1,36 @@
+{
+  "tested_source_commit": "525a57992a0331dc3c396db869b28b9828646d4f",
+  "gcc_release_ctest": {
+    "tests": 12,
+    "failures": 0
+  },
+  "clang_18_asan_ubsan_ctest": {
+    "tests": 12,
+    "failures": 0,
+    "local_leak_detection": false
+  },
+  "tooling_unit_tests": 37,
+  "risk_assertions": 67524,
+  "feed_view_allocation_free_cycles": 1000,
+  "parser_fuzz": {
+    "executions": 422296,
+    "seconds": 21,
+    "seed_files": 311,
+    "sanitizers": [
+      "ASan",
+      "UBSan"
+    ]
+  },
+  "core_benchmark_source_unchanged_from": "9d8bd08",
+  "evidence_audit": {
+    "derived": {
+      "bitmap_linear_p999_reduction_percent": "7.48129675810",
+      "bitmap_linear_p99_reduction_percent": "9.96677740864",
+      "bitmap_linear_throughput_improvement_percent": "2.03857828397",
+      "bitmap_reference_throughput_ratio": "2.18861665571"
+    },
+    "verified_commands_per_run": 1000000,
+    "verified_engine_runs": 15,
+    "verified_latency_samples": 15000000
+  }
+}
