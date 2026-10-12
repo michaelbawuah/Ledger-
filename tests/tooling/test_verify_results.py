@@ -3,6 +3,8 @@ import copy
 import csv
 import importlib.util
 import json
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -212,6 +214,7 @@ class AccountingTests(FileFixture):
             with self.assertRaises(verifier.VerificationError):
                 self.accounting(summary=summary)
 
+
     def test_rejects_metadata_types_and_integer_overflow(self):
         mutations = (("machine", "logical_cpus", True), ("clock", "steady", False),
                      ("compiler", "ndebug", 1), ("config", "max_orders", 2**64),
@@ -222,6 +225,35 @@ class AccountingTests(FileFixture):
             with self.assertRaises(verifier.VerificationError):
                 self.accounting(summary=summary)
 
+
+class IntegrationTests(FileFixture):
+    def write_evidence(self):
+        self.write_summary(fixture_summary())
+        runs, histogram = fixture_rows()
+        self.write_csv("runs.csv", verifier.RUN_COLUMNS, runs)
+        self.write_csv("latency_histogram.csv", verifier.HISTOGRAM_COLUMNS, histogram)
+
+    def test_complete_fixture_and_deterministic_cli_json(self):
+        self.write_evidence()
+        report = verifier.verify_directory(self.root)
+        self.assertEqual(report["verified_latency_samples"], 9000)
+        command = [sys.executable, str(SCRIPT), str(self.root)]
+        first = subprocess.run(command, text=True, capture_output=True, check=True)
+        second = subprocess.run(command, text=True, capture_output=True, check=True)
+        self.assertEqual(first.stdout, second.stdout)
+        self.assertEqual(json.loads(first.stdout), report)
+
+    def test_cli_reports_missing_evidence_without_traceback(self):
+        process = subprocess.run([sys.executable, str(SCRIPT), str(self.root)],
+                                 text=True, capture_output=True)
+        self.assertEqual(process.returncode, 1)
+        self.assertIn("verification failed", process.stderr)
+        self.assertNotIn("Traceback", process.stderr)
+
+    def test_committed_core_evidence_is_consistent(self):
+        report = verifier.verify_directory(SCRIPT.parents[1] / "bench/results/core")
+        self.assertEqual(report["verified_engine_runs"], 15)
+        self.assertEqual(report["verified_latency_samples"], 15000000)
 
 if __name__ == "__main__":
     unittest.main()

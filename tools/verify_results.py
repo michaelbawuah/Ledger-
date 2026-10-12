@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Verify Ledger's core benchmark evidence offline using only the standard library."""
+import argparse
 import csv
 import json
 import re
+import sys
 from collections import defaultdict
 from decimal import Decimal, localcontext
 from pathlib import Path
@@ -273,3 +275,37 @@ def verify_accounting(summary, runs):
         for field in fields:
             require(values[field] == summary["engines"][engine][field],
                     f"{key}.{field}: differs from engine summary")
+
+
+def verify_directory(directory):
+    directory = Path(directory)
+    summary = read_summary(directory / "summary.json")
+    runs = read_runs(directory / "runs.csv", summary)
+    histograms = read_histograms(directory / "latency_histogram.csv", summary, runs)
+    verify_accounting(summary, runs)
+    derived = verify_metrics(summary, runs)
+    return {
+        "verified_commands_per_run": summary["commands"],
+        "verified_engine_runs": len(runs),
+        "verified_latency_samples": sum(sum(values.values()) for values in histograms.values()),
+        "derived": {key: format(value, ".12g") for key, value in sorted(derived.items())},
+    }
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("directory", nargs="?", type=Path,
+                        default=Path(__file__).resolve().parents[1] / "bench/results/core",
+                        help="Directory containing summary.json, runs.csv and latency_histogram.csv")
+    args = parser.parse_args(argv)
+    try:
+        report = verify_directory(args.directory)
+    except (OSError, ValueError, ArithmeticError) as error:
+        print(f"benchmark verification failed: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
