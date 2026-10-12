@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1015" viewBox="0 0 1200 1015" role="img" aria-labelledby="title desc">
+<title id="title">Ledger: price-time priority worked trade</title><desc id="desc">An illustrative exact worked trade: resting asks A4, B6, C3 at 100 ticks; incoming buy IOC8 at 100. Fill A4 then B4; B2 and C3 remain. Two trades, one removed maker, zero emptied price levels, seven events.</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#64748b"/></marker></defs>
+<rect width="1200" height="1015" fill="white"/>
+<g font-family="DejaVu Sans,Arial,sans-serif" fill="#1e293b">
+<text x="40" y="52.0" font-size="32" font-weight="bold" fill="#1e293b" text-anchor="start">Price first. FIFO within the price.</text>
+<text x="40" y="86.0" font-size="16" font-weight="normal" fill="#64748b" text-anchor="start">Worked example · illustrative state, not a captured performance measurement</text>
+<text x="40" y="137.0" font-size="15" font-weight="bold" fill="#087f8c" text-anchor="start">BEFORE · BEST ASK = 100 TICKS</text>
+<rect x="40" y="164" width="215" height="130" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="40" y="164" width="5" height="130" rx="2" fill="#64748b"/>
+<text x="58" y="193.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Ask level 100</text>
+<text x="58" y="222.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">units = 13 · orders = 3</text>
+<text x="58" y="242.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">head → A · tail → C</text>
+<text x="58" y="262.6" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">occupancy bit = 1</text>
+<rect x="302" y="164" width="276" height="130" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="302" y="164" width="5" height="130" rx="2" fill="#087f8c"/>
+<text x="320" y="193.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">A · ID 101</text>
+<text x="320" y="222.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">sell 4 units @ 100 ticks</text>
+<text x="320" y="242.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">FIFO arrival: first</text>
+<text x="320" y="262.6" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">prev / next are pool-slot indices</text>
+<rect x="593" y="164" width="276" height="130" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="593" y="164" width="5" height="130" rx="2" fill="#087f8c"/>
+<text x="611" y="193.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">B · ID 102</text>
+<text x="611" y="222.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">sell 6 units @ 100 ticks</text>
+<text x="611" y="242.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">FIFO arrival: second</text>
+<text x="611" y="262.6" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">prev / next are pool-slot indices</text>
+<rect x="884" y="164" width="276" height="130" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="884" y="164" width="5" height="130" rx="2" fill="#087f8c"/>
+<text x="902" y="193.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">C · ID 103</text>
+<text x="902" y="222.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">sell 3 units @ 100 ticks</text>
+<text x="902" y="242.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">FIFO arrival: third</text>
+<text x="902" y="262.6" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">prev / next are pool-slot indices</text>
+<polyline points="255,229 298,229" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<polyline points="578,229 589,229" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<polyline points="869,229 880,229" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="40" y="337" width="1119" height="87" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="40" y="337" width="5" height="87" rx="2" fill="#e07a5f"/>
+<text x="58" y="366.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Incoming order · ID 104</text>
+<text x="58" y="395.0" font-size="15" font-weight="normal" fill="#475569" text-anchor="start">Buy LIMIT / IOC · 8 units @ 100 ticks · crosses the resting asks · execution price is the maker price</text>
+<text x="40" y="471.0" font-size="15" font-weight="bold" fill="#087f8c" text-anchor="start">MATCHING · ALWAYS TAKE THE CURRENT HEAD</text>
+<rect x="40" y="493" width="532" height="139" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="40" y="493" width="5" height="139" rx="2" fill="#e07a5f"/>
+<text x="58" y="522.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Fill 1 · maker A</text>
+<text x="58" y="551.0" font-size="15" font-weight="normal" fill="#475569" text-anchor="start">Trade 4 units @ 100 · A remaining = 0</text>
+<text x="58" y="572.75" font-size="15" font-weight="normal" fill="#475569" text-anchor="start">Incoming remaining = 4 · unlink A, return its slot</text>
+<text x="58" y="594.5" font-size="15" font-weight="normal" fill="#475569" text-anchor="start">Level now: B6 → C3 · 9 units · 2 orders</text>
+<rect x="618" y="493" width="541" height="139" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="618" y="493" width="5" height="139" rx="2" fill="#e07a5f"/>
+<text x="636" y="522.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Fill 2 · maker B</text>
+<text x="636" y="551.0" font-size="15" font-weight="normal" fill="#475569" text-anchor="start">Trade 4 units @ 100 · B remaining = 2</text>
+<text x="636" y="572.75" font-size="15" font-weight="normal" fill="#475569" text-anchor="start">Incoming remaining = 0 · B keeps its FIFO position</text>
+<text x="636" y="594.5" font-size="15" font-weight="normal" fill="#475569" text-anchor="start">Level now: B2 → C3 · 5 units · 2 orders</text>
+<polyline points="572,561 614,561" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<text x="40" y="679.0" font-size="15" font-weight="bold" fill="#087f8c" text-anchor="start">AFTER · NO PRICE LEVEL EMPTIED</text>
+<rect x="40" y="701" width="215" height="126" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="40" y="701" width="5" height="126" rx="2" fill="#64748b"/>
+<text x="58" y="730.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Ask level 100</text>
+<text x="58" y="759.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">units = 5 · orders = 2</text>
+<text x="58" y="779.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">head → B · tail → C</text>
+<text x="58" y="799.6" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">occupancy bit stays 1</text>
+<rect x="302" y="701" width="276" height="126" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="302" y="701" width="5" height="126" rx="2" fill="#087f8c"/>
+<text x="320" y="730.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">B · ID 102</text>
+<text x="320" y="759.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">sell 2 units @ 100 ticks</text>
+<text x="320" y="779.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Still the oldest live maker</text>
+<text x="320" y="799.6" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">next → C</text>
+<rect x="620" y="701" width="276" height="126" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="620" y="701" width="5" height="126" rx="2" fill="#087f8c"/>
+<text x="638" y="730.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">C · ID 103</text>
+<text x="638" y="759.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">sell 3 units @ 100 ticks</text>
+<text x="638" y="779.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">No fill; priority unchanged</text>
+<text x="638" y="799.6" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">next → no_slot</text>
+<polyline points="255,763 298,763" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<polyline points="578,763 616,763" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<text x="928" y="744.0" font-size="23" font-weight="bold" fill="#e07a5f" text-anchor="start">2 trades</text>
+<text x="928" y="776.0" font-size="15" font-weight="normal" fill="#64748b" text-anchor="start">8 units executed</text>
+<text x="928" y="804.0" font-size="15" font-weight="normal" fill="#64748b" text-anchor="start">0 levels emptied</text>
+<polyline points="40,865 1160,865" fill="none" stroke="#d5dee5" stroke-width="1.8"/>
+<text x="40" y="899.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Seven reports for the incoming command</text>
+<text x="40" y="931.0" font-size="15" font-weight="normal" fill="#64748b" text-anchor="start">Accepted(104)  →  Trade(104,101,4)  →  Filled(101)  →  PartiallyFilled(104)</text>
+<text x="40" y="960.0" font-size="15" font-weight="normal" fill="#64748b" text-anchor="start">→  Trade(104,102,4)  →  PartiallyFilled(102)  →  Filled(104)</text>
+<text x="40" y="995.0" font-size="13" font-weight="normal" fill="#64748b" text-anchor="start">Replace is cancel-replace and always loses time priority, including a size reduction. FOK rejects before mutation if liquidity is insufficient.</text>
+</g>
+</svg>

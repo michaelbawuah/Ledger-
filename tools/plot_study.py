@@ -24,6 +24,7 @@ import os
 from pathlib import Path
 import statistics
 import sys
+import textwrap
 import warnings
 
 SCHEMA_VERSION = 1
@@ -296,7 +297,7 @@ class Renderer:
             ax.spines[["top", "right"]].set_visible(False)
             ax.grid(axis="y", linewidth=.6)
             ax.set_axisbelow(True)
-        fig.text(.065, .012, caption, fontsize=9, color="#64748b", va="bottom", wrap=True)
+        fig.text(.065, .012, textwrap.fill(caption, width=150), fontsize=9, color="#64748b", va="bottom")
         fig.tight_layout(rect=(.035, .10, .985, .91))
         path = self.outdir / f"{name}.svg"
         fig.savefig(path, metadata={"Date": None, "Description": caption})
@@ -488,7 +489,7 @@ class Renderer:
         valid = values[np.isfinite(values)]
         if not len(valid):
             return
-        fig, (ax,) = self.figure("Fill count and depleted price levels explain different work",height=7.3)
+        fig, (ax,) = self.figure("Fills and emptied levels explain different work",height=7.3)
         image = ax.imshow(values,origin="lower",aspect="auto",cmap="YlGnBu",
             norm=LogNorm(vmin=max(1,valid.min()),vmax=max(valid.max(),valid.min()*1.01)))
         for i in range(8):

@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1000" viewBox="0 0 1200 1000" role="img" aria-labelledby="title desc">
+<title id="title">Ledger: core path and bounded memory</title><desc id="desc">Exact implementation diagram. Construction owns the allocations; process mutates preallocated storage and emits into caller storage. Timing boundaries exclude ingestion, snapshots and consumption.</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#64748b"/></marker></defs>
+<rect width="1200" height="1000" fill="white"/>
+<g font-family="DejaVu Sans,Arial,sans-serif" fill="#1e293b">
+<text x="40" y="52.0" font-size="32" font-weight="bold" fill="#1e293b" text-anchor="start">Core path and bounded memory</text>
+<text x="40" y="86.0" font-size="16" font-weight="normal" fill="#64748b" text-anchor="start">Mechanism diagram · single book owner · integer price ticks · C++23</text>
+<text x="40" y="139.0" font-size="15" font-weight="bold" fill="#087f8c" text-anchor="start">01  ONE COMMAND, ONE MUTATION BOUNDARY</text>
+<rect x="40" y="163" width="208" height="119" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="40" y="163" width="5" height="119" rx="2" fill="#64748b"/>
+<text x="58" y="192.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Input Command</text>
+<text x="58" y="221.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">sequence, ID, action</text>
+<text x="58" y="241.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">side, price, quantity, TIF</text>
+<rect x="281" y="163" width="254" height="119" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="281" y="163" width="5" height="119" rx="2" fill="#087f8c"/>
+<text x="299" y="192.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Validate before mutation</text>
+<text x="299" y="221.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Output capacity; fields; ID</text>
+<text x="299" y="241.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">capacity; FOK availability</text>
+<rect x="568" y="163" width="267" height="119" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="568" y="163" width="5" height="119" rx="2" fill="#087f8c"/>
+<text x="586" y="192.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Choose the operation</text>
+<text x="586" y="221.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Cancel: unlink live slot</text>
+<text x="586" y="241.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Replace: validated cancel-replace</text>
+<rect x="868" y="163" width="292" height="119" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="868" y="163" width="5" height="119" rx="2" fill="#e07a5f"/>
+<text x="886" y="192.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Match crossing orders</text>
+<text x="886" y="221.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Best opposite price first</text>
+<text x="886" y="241.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Oldest maker at that price</text>
+<polyline points="248,222 277,222" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<polyline points="535,222 564,222" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<polyline points="835,222 864,222" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="281" y="331" width="254" height="113" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="281" y="331" width="5" height="113" rx="2" fill="#087f8c"/>
+<text x="299" y="360.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Disposition of residual</text>
+<text x="299" y="389.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">GTC limit: append to tail</text>
+<text x="299" y="409.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">IOC / market: expire residual</text>
+<rect x="568" y="331" width="267" height="113" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="568" y="331" width="5" height="113" rx="2" fill="#e07a5f"/>
+<text x="586" y="360.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Caller EventBuffer</text>
+<text x="586" y="389.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Accepted / trade / fill reports</text>
+<text x="586" y="409.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Cancelled / expired / rejected</text>
+<rect x="868" y="331" width="292" height="113" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="868" y="331" width="5" height="113" rx="2" fill="#64748b"/>
+<text x="886" y="360.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Applied / Rejected</text>
+<text x="886" y="389.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">OutputFull: no mutation</text>
+<text x="886" y="409.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Consumption occurs after process</text>
+<polyline points="1001,282 1001,306 408,306 408,327" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<polyline points="701,282 701,327" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<text x="716" y="322.0" font-size="12" font-weight="normal" fill="#64748b" text-anchor="start">cancel</text>
+<polyline points="535,387 564,387" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<polyline points="835,387 864,387" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<polyline points="40,468 1160,468" fill="none" stroke="#087f8c" stroke-width="1.8" stroke-dasharray="5 5"/>
+<text x="40" y="496.0" font-size="15" font-weight="bold" fill="#087f8c" text-anchor="start">02  CONSTRUCTION OWNS STORAGE; PROCESS REUSES IT</text>
+<rect x="40" y="522" width="349" height="181" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="40" y="522" width="5" height="181" rx="2" fill="#087f8c"/>
+<text x="58" y="551.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">OrderPool · N fixed slots</text>
+<text x="58" y="580.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Node: ID, price, quantity, side</text>
+<text x="58" y="600.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">previous slot, next slot, live flag</text>
+<text x="58" y="620.6" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Intrusive queues + intrusive free list</text>
+<text x="58" y="640.9" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">acquire / release never allocate</text>
+<rect x="424" y="522" width="351" height="181" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="424" y="522" width="5" height="181" rx="2" fill="#64748b"/>
+<text x="442" y="551.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">IdIndex · open addressing</text>
+<text x="442" y="580.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Entry: complete 64-bit ID → slot</text>
+<text x="442" y="600.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Power-of-two capacity ≥ 2 × N</text>
+<text x="442" y="620.6" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Maximum live load factor: 1/2</text>
+<text x="442" y="640.9" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Backward-shift deletion heals gaps</text>
+<rect x="810" y="522" width="350" height="181" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="810" y="522" width="5" height="181" rx="2" fill="#e07a5f"/>
+<text x="828" y="551.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Two price-level arrays</text>
+<text x="828" y="580.0" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">L = max_price − min_price + 1</text>
+<text x="828" y="600.3" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Per level: head, tail, units, orders</text>
+<text x="828" y="620.6" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">Bids and asks each own L levels</text>
+<text x="828" y="640.9" font-size="14" font-weight="normal" fill="#475569" text-anchor="start">FIFO links point into OrderPool</text>
+<rect x="40" y="744" width="349" height="128" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="40" y="744" width="5" height="128" rx="2" fill="#087f8c"/>
+<text x="58" y="773.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Two occupancy bitmaps</text>
+<text x="58" y="802.0" font-size="13" font-weight="normal" fill="#475569" text-anchor="start">ceil(L / 64) words per side</text>
+<text x="58" y="820.85" font-size="13" font-weight="normal" fill="#475569" text-anchor="start">One bit per nonempty price level</text>
+<text x="58" y="839.7" font-size="13" font-weight="normal" fill="#475569" text-anchor="start">Best price cache maintained on change</text>
+<rect x="424" y="744" width="351" height="128" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="424" y="744" width="5" height="128" rx="2" fill="#64748b"/>
+<text x="442" y="773.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">No growth in the timed call</text>
+<text x="442" y="802.0" font-size="13" font-weight="normal" fill="#475569" text-anchor="start">process(Command, EventBuffer)</text>
+<text x="442" y="820.85" font-size="13" font-weight="normal" fill="#475569" text-anchor="start">No snapshot construction or callbacks</text>
+<text x="442" y="839.7" font-size="13" font-weight="normal" fill="#475569" text-anchor="start">Single-writer mutation; explicit ownership</text>
+<rect x="810" y="744" width="350" height="128" rx="10" fill="#f8fafc" stroke="#d5dee5"/>
+<rect x="810" y="744" width="5" height="128" rx="2" fill="#e07a5f"/>
+<text x="828" y="773.0" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="start">Caller report storage</text>
+<text x="828" y="802.0" font-size="13" font-weight="normal" fill="#475569" text-anchor="start">Required capacity ≥ 3 × N + 4 events</text>
+<text x="828" y="820.85" font-size="13" font-weight="normal" fill="#475569" text-anchor="start">Checked before any mutation</text>
+<text x="828" y="839.7" font-size="13" font-weight="normal" fill="#475569" text-anchor="start">No event-vector growth in process</text>
+<polyline points="40,916 1160,916" fill="none" stroke="#d5dee5" stroke-width="1.8"/>
+<text x="40" y="947.0" font-size="14" font-weight="normal" fill="#64748b" text-anchor="start">N = configured maximum live orders; formulas show capacities, not ABI-dependent byte sizes.</text>
+<text x="40" y="973.0" font-size="14" font-weight="normal" fill="#64748b" text-anchor="start">Rejected commands skip mutation; cancel skips matching. Diagnostic snapshots and invariant checks may allocate.</text>
+</g>
+</svg>
