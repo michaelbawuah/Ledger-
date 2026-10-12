@@ -32,6 +32,39 @@ class InlineLinkTests(DocumentFixture):
                              '![Plot](../plot.svg "Chart")\n')
         self.assertEqual(checker.check_document(path, self.root), [])
 
+
+class ReferenceAndBoundaryTests(DocumentFixture):
+    def test_full_collapsed_and_shortcut_references_are_case_insensitive(self):
+        (self.root / "data file.csv").write_text("data", encoding="utf-8")
+        path = self.document("[Full][Data File]\n[DATA FILE][]\n[Data File]\n"
+                             "[Data File]: <../data file.csv>\n")
+        self.assertEqual(checker.check_document(path, self.root), [])
+
+    def test_reports_undefined_and_duplicate_definitions(self):
+        path = self.document("[Full][missing]\n[Repeat]: ../LICENSE\n[repeat]: ../LICENSE\n")
+        issues = checker.check_document(path, self.root)
+        self.assertTrue(any("undefined reference missing" in issue for issue in issues))
+        self.assertTrue(any("duplicate reference definition repeat" in issue for issue in issues))
+
+    def test_rejects_parent_absolute_and_encoded_root_escapes(self):
+        path = self.document("[Parent](../../outside.txt)\n[Absolute](/etc/passwd)\n"
+                             "[Encoded](%2e%2e/%2e%2e/outside.txt)\n")
+        issues = checker.check_document(path, self.root)
+        self.assertEqual(len(issues), 3)
+        self.assertTrue(all("escapes repository root" in issue for issue in issues))
+
+    def test_rejects_symlinks_to_outside_repository(self):
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        target = Path(outside.name) / "outside.md"
+        target.write_text("outside", encoding="utf-8")
+        try:
+            (self.root / "docs/link.md").symlink_to(target)
+        except OSError as error:
+            self.skipTest(f"symlinks unavailable: {error}")
+        path = self.document("[Link](link.md)\n")
+        self.assertIn("escapes repository root", checker.check_document(path, self.root)[0])
+
     def test_reports_missing_links_with_line_numbers(self):
         path = self.document("Intro\n[Missing](missing.md)\n![Absent](absent.png)\n")
         issues = checker.check_document(path, self.root)

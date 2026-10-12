@@ -4,6 +4,9 @@ from pathlib import Path
 import re
 from urllib.parse import unquote, urlsplit
 
+DEFINITION = re.compile(r"(?m)^ {0,3}\[([^\]\n]+)\]:[ \t]*(.+)$")
+REFERENCE = re.compile(r"!?\[([^\]\n]+)\](?:\[([^\]\n]*)\])?")
+
 
 def destination(content):
     """Extract a destination, preserving spaces in angle-bracket destinations."""
@@ -49,18 +52,56 @@ def inline_links(text):
         index = cursor
 
 
+def reference_label(text):
+    return " ".join(text.split()).casefold()
+
+
+def document_links(text):
+    """Resolve full/collapsed/shortcut references alongside inline links."""
+    definitions = {}
+    issues = []
+    masked = list(text)
+    for match in DEFINITION.finditer(text):
+        label = reference_label(match.group(1))
+        if label in definitions:
+            issues.append((text.count("\n", 0, match.start()) + 1, f"duplicate reference definition {label}"))
+        definitions[label] = destination(match.group(2))
+        masked[match.start():match.end()] = " " * (match.end() - match.start())
+    body = "".join(masked)
+    links = list(inline_links(body))
+    for match in REFERENCE.finditer(body):
+        # Inline targets and their optional titles are handled above.
+        if body[match.end():match.end() + 1] == "(":
+            continue
+        explicit = match.group(2) is not None
+        label = reference_label(match.group(2) or match.group(1))
+        line = body.count("\n", 0, match.start()) + 1
+        if label in definitions:
+            links.append((line, definitions[label]))
+        elif explicit:
+            issues.append((line, f"undefined reference {label}"))
+    return sorted(links), issues
+
+
 def check_document(path, root):
     """Return local-link problems for one Markdown document."""
     path, root = Path(path).resolve(), Path(root).resolve()
+    if not path.is_relative_to(root):
+        raise ValueError(f"document escapes repository root: {path}")
     issues = []
     text = path.read_text(encoding="utf-8")
-    for line, target in inline_links(text):
+    links, reference_issues = document_links(text)
+    for line, message in reference_issues:
+        issues.append(f"{path.relative_to(root)}:{line}: {message}")
+    for line, target in links:
         parts = urlsplit(target)
         if parts.scheme or parts.netloc:
             continue
         if not parts.path:
             continue
         resolved = (path.parent / unquote(parts.path)).resolve()
-        if not resolved.exists():
+        if not resolved.is_relative_to(root):
+            issues.append(f"{path.relative_to(root)}:{line}: target escapes repository root {target}")
+        elif not resolved.exists():
             issues.append(f"{path.relative_to(root)}:{line}: missing local target {target}")
-    return issues
+    return sorted(issues)
