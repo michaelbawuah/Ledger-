@@ -2,11 +2,68 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <new>
 #include <ranges>
 #include <stdexcept>
 #include <vector>
+#ifdef _WIN32
+#include <malloc.h>
+#endif
+
+namespace {
+thread_local bool track_allocations = false;
+thread_local std::size_t allocation_count = 0;
+void* allocate(std::size_t bytes) {
+    if (track_allocations) ++allocation_count;
+    if (auto* pointer = std::malloc(bytes ? bytes : 1)) return pointer;
+    throw std::bad_alloc{};
+}
+void* allocate_aligned(std::size_t bytes, std::size_t alignment) {
+    if (track_allocations) ++allocation_count;
+    void* pointer{};
+#ifdef _WIN32
+    pointer = _aligned_malloc(bytes ? bytes : alignment, alignment);
+    if (pointer) return pointer;
+#else
+    if (posix_memalign(&pointer, alignment, bytes ? bytes : alignment) == 0) return pointer;
+#endif
+    throw std::bad_alloc{};
+}
+void free_aligned(void* pointer) noexcept {
+#ifdef _WIN32
+    _aligned_free(pointer);
+#else
+    std::free(pointer);
+#endif
+}
+}
+void* operator new(std::size_t bytes) { return allocate(bytes); }
+void* operator new[](std::size_t bytes) { return allocate(bytes); }
+void operator delete(void* pointer) noexcept { std::free(pointer); }
+void operator delete[](void* pointer) noexcept { std::free(pointer); }
+void operator delete(void* pointer, std::size_t) noexcept { std::free(pointer); }
+void operator delete[](void* pointer, std::size_t) noexcept { std::free(pointer); }
+void* operator new(std::size_t bytes, const std::nothrow_t&) noexcept { try { return allocate(bytes); } catch (...) { return nullptr; } }
+void* operator new[](std::size_t bytes, const std::nothrow_t&) noexcept { try { return allocate(bytes); } catch (...) { return nullptr; } }
+void operator delete(void* pointer, const std::nothrow_t&) noexcept { std::free(pointer); }
+void operator delete[](void* pointer, const std::nothrow_t&) noexcept { std::free(pointer); }
+void* operator new(std::size_t bytes, std::align_val_t alignment) { return allocate_aligned(bytes, static_cast<std::size_t>(alignment)); }
+void* operator new[](std::size_t bytes, std::align_val_t alignment) { return allocate_aligned(bytes, static_cast<std::size_t>(alignment)); }
+void operator delete(void* pointer, std::align_val_t) noexcept { free_aligned(pointer); }
+void operator delete[](void* pointer, std::align_val_t) noexcept { free_aligned(pointer); }
+void operator delete(void* pointer, std::size_t, std::align_val_t) noexcept { free_aligned(pointer); }
+void operator delete[](void* pointer, std::size_t, std::align_val_t) noexcept { free_aligned(pointer); }
+void* operator new(std::size_t bytes, std::align_val_t alignment, const std::nothrow_t&) noexcept {
+    try { return allocate_aligned(bytes, static_cast<std::size_t>(alignment)); } catch (...) { return nullptr; }
+}
+void* operator new[](std::size_t bytes, std::align_val_t alignment, const std::nothrow_t&) noexcept {
+    try { return allocate_aligned(bytes, static_cast<std::size_t>(alignment)); } catch (...) { return nullptr; }
+}
+void operator delete(void* pointer, std::align_val_t, const std::nothrow_t&) noexcept { free_aligned(pointer); }
+void operator delete[](void* pointer, std::align_val_t, const std::nothrow_t&) noexcept { free_aligned(pointer); }
 
 using namespace ledger;
 namespace {
@@ -122,6 +179,52 @@ void test_all_record_validation() {
     require(FeedView::parse(framed, retained) && std::ranges::equal(retained, semantic_errors),
             "framing preflight incorrectly rejected engine-semantic errors");
 }
+
+void test_golden_unaligned_and_allocations() {
+    // Hand-written wire bytes are independent of the encoder under test.
+    constexpr std::array<unsigned char, 72> golden{
+        0x4c, 0x47, 0x52, 0x46, 0x45, 0x45, 0x44, 0x00,
+        0x01, 0x00, 0x20, 0x00, 0x28, 0x00, 0x00, 0x00,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
+        0xff, 0xff, 0xff, 0xff, 0x01, 0x03, 0x02, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    };
+    std::vector<std::byte> owner(golden.size() + 1);
+    for (std::size_t i = 0; i < golden.size(); ++i) owner[i + 1] = std::byte(golden[i]);
+    const auto wire = std::span<const std::byte>(owner).subspan(1);
+    const Command expected{0x0102030405060708ULL, std::numeric_limits<OrderId>::max(),
+                           std::numeric_limits<Price>::min(), std::numeric_limits<Quantity>::max(),
+                           Side::Sell, Action::Replace, TimeInForce::FOK};
+    FeedView view;
+    require(FeedView::parse(wire, view, 1) && *view.begin() == expected, "unaligned golden feed differs");
+    require(std::ranges::equal(view.encoded_records(), encode_record(expected)), "golden wire roundtrip differs");
+    auto detached_iterator = view.begin();
+    const auto empty = fixture({});
+    require(FeedView::parse(empty, view) && *detached_iterator == expected,
+            "iterator depends on the view object's replacement");
+
+    auto malformed = owner; malformed.back() = std::byte{1};
+    const auto bad_wire = std::span<const std::byte>(malformed).subspan(1);
+    const auto before = allocation_count;
+    bool results_correct = true;
+    track_allocations = true;
+    for (std::size_t run = 0; run < 1000; ++run) {
+        results_correct &= FeedView::parse(wire, view, 1);
+        auto decoded = expected;
+        results_correct &= view.read(0, decoded) && decoded == expected;
+        results_correct &= !view.read(std::numeric_limits<std::size_t>::max(), decoded);
+        results_correct &= !FeedView::parse(bad_wire, view);
+        results_correct &= !FeedView::parse(wire.first(17), view);
+        for (const auto command : view) results_correct &= command == expected;
+    }
+    track_allocations = false;
+    require(results_correct, "allocation-free parser operations produced wrong results");
+    require(allocation_count == before, "feed parsing or access requested C++ heap storage");
+}
 }
 
 int main() {
@@ -129,9 +232,11 @@ int main() {
         test_valid_and_empty();
         test_framing_and_header();
         test_all_record_validation();
-        std::cout << "PASS feed views, exact framing, every-record preflight and failure atomicity\n";
+        test_golden_unaligned_and_allocations();
+        std::cout << "PASS feed views, hostile framing, atomicity, unaligned golden wire and 1000 allocation-free cycles\n";
         return 0;
     } catch (const std::exception& error) {
+        track_allocations = false;
         std::cerr << "FAIL " << error.what() << '\n'; return 1;
     }
 }
