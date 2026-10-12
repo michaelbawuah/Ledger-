@@ -1,0 +1,15 @@
+Test project /workspace/scratch/796e0759699b/ledger/build/native
+    Start 1: engine_semantics
+1/5 Test #1: engine_semantics .................   Passed    0.00 sec
+    Start 2: allocation_free
+2/5 Test #2: allocation_free ..................   Passed    0.03 sec
+    Start 3: spsc_stress
+3/5 Test #3: spsc_stress ......................   Passed    0.08 sec
+    Start 4: feed_roundtrip
+4/5 Test #4: feed_roundtrip ...................   Passed    0.01 sec
+    Start 5: differential_smoke
+5/5 Test #5: differential_smoke ...............   Passed    0.01 sec
+
+100% tests passed out of 5
+
+Total Test time (real) =   0.14 sec

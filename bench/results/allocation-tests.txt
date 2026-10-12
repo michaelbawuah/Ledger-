@@ -1,0 +1,3 @@
+bitmap: 500070 hot-path calls, 0 C++ allocations; 179355 applied, 320714 rejected
+linear: 500070 hot-path calls, 0 C++ allocations; 179355 applied, 320714 rejected
+PASS 1000140 total allocation checks

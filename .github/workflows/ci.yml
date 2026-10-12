@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
-      - run: cmake --preset tsan && cmake --build --preset tsan --target ledger_spsc_tests --parallel 2
+      - run: cmake --preset tsan -DCMAKE_CXX_COMPILER=clang++ && cmake --build --preset tsan --target ledger_spsc_tests --parallel 2
       - run: build/tsan/ledger_spsc_tests
   long-differential:
     if: github.event_name == 'workflow_dispatch'

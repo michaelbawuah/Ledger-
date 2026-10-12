@@ -1,0 +1,13 @@
+{
+  "workload": "synthetic_five_command_lifecycle_small_book",
+  "commands": 1000000,
+  "events": 2200000,
+  "trades": 400000,
+  "checksum": 880004400000,
+  "queue_capacity": 4096,
+  "cpu_pinned": false,
+  "elapsed_seconds": 0.134870232,
+  "commands_per_second": 7414534.588,
+  "latency_samples": 10000,
+  "enqueue_attempt_to_core_process_ns": {"min": 371, "mean": 342019.4215, "p50": 301634, "p90": 526142, "p99": 1082550, "p999": 1164774, "max": 1175991}
+}

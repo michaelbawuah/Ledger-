@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "generator": "splitmix64-bounded-adversarial-v1",
+  "base_seed": 8330235730275514375,
+  "first_seed": 0,
+  "seeds": 4,
+  "commands_per_seed": 250000,
+  "commands_compared": 1000000,
+  "reports_compared": 2089015,
+  "trades_compared": 339481,
+  "applied_commands": 473456,
+  "rejected_commands": 526544,
+  "structural_checkpoints": 248,
+  "checkpoint_interval": 4096,
+  "linear_variant_compared": true,
+  "per_command_checks": ["process_result", "all_event_fields", "statistics", "size", "resting_quantity", "best_quotes", "quantity_conservation", "uncrossed_quotes"],
+  "checkpoint_checks": ["full_structural_invariants", "full_FIFO_orders", "all_levels", "all_statistics"],
+  "elapsed_seconds": 1.539772
+}
