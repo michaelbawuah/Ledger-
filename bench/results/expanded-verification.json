@@ -1,5 +1,4 @@
 {
-  "tested_source_commit": "525a57992a0331dc3c396db869b28b9828646d4f",
   "gcc_release_ctest": {
     "tests": 12,
     "failures": 0
@@ -21,7 +20,6 @@
       "UBSan"
     ]
   },
-  "core_benchmark_source_unchanged_from": "9d8bd08",
   "evidence_audit": {
     "derived": {
       "bitmap_linear_p999_reduction_percent": "7.48129675810",
@@ -32,5 +30,7 @@
     "verified_commands_per_run": 1000000,
     "verified_engine_runs": 15,
     "verified_latency_samples": 15000000
-  }
+  },
+  "tested_source_tree": "e0936972ae7cffbeacd81a4406bb4a8dd170552c",
+  "core_benchmark_source_unchanged_from_tree": "12c423c11641a72177f51efdfa4d8d67728616db"
 }
