@@ -26,6 +26,7 @@ enum class RiskReject : std::uint8_t {
     None, InvalidAction, InvalidSide, InvalidTimeInForce, InvalidId,
     InvalidQuantity, OrderQuantityLimit,
     MissingMarketValuation, InvalidPrice, PriceBand,
+    OrderNotionalLimit,
 };
 
 struct RiskDecision {
@@ -65,7 +66,13 @@ public:
         if (market && valuation <= 0) return {RiskReject::MissingMarketValuation};
         if (valuation <= 0) return {RiskReject::InvalidPrice};
         if (valuation < config_.min_price || valuation > config_.max_price) return {RiskReject::PriceBand};
-        return {RiskReject::None, context.position, valuation};
+        const auto unsigned_price = static_cast<std::uint64_t>(valuation);
+        // Divide before multiplying: price * quantity may exceed uint64_t.
+        if (command.quantity > config_.max_order_notional / unsigned_price) {
+            return {RiskReject::OrderNotionalLimit};
+        }
+        const auto notional = unsigned_price * static_cast<std::uint64_t>(command.quantity);
+        return {RiskReject::None, context.position, valuation, notional};
     }
 
 private:

@@ -134,6 +134,42 @@ void integer_price_band() {
     expect(policy, command, RiskReject::PriceBand, {0, 106});
     require(policy.evaluate(command, {0, 105}).valuation_price == 105, "market valuation differs");
 }
+
+void notional_without_overflow() {
+    using namespace ledger;
+    RiskConfig config{};
+    config.max_order_notional = 1'001;
+    const RiskPolicy policy(config);
+    auto command = limit_order();
+    for (const auto side : {Side::Buy, Side::Sell}) {
+        command.side = side;
+        expect(policy, command, RiskReject::None);
+        require(policy.evaluate(command).order_notional == 1'000, "accepted notional differs");
+        command.quantity = 11;
+        expect(policy, command, RiskReject::OrderNotionalLimit);
+        command.quantity = 10;
+    }
+    command.action = Action::Market;
+    expect(policy, command, RiskReject::None, {0, 100});
+    expect(policy, command, RiskReject::OrderNotionalLimit, {0, 101});
+
+    config.max_order_quantity = std::numeric_limits<Quantity>::max();
+    config.max_order_notional = std::numeric_limits<std::uint64_t>::max();
+    config.max_abs_inventory = std::numeric_limits<std::int64_t>::max();
+    const RiskPolicy extreme(config);
+    command = limit_order();
+    command.price = std::numeric_limits<Price>::max();
+    command.quantity = 2;
+    expect(extreme, command, RiskReject::None);
+    require(extreme.evaluate(command).order_notional ==
+            std::numeric_limits<std::uint64_t>::max() - 1, "wide accepted notional differs");
+    command.quantity = 3;
+    expect(extreme, command, RiskReject::OrderNotionalLimit);
+    command.quantity = std::numeric_limits<Quantity>::max();
+    expect(extreme, command, RiskReject::OrderNotionalLimit);
+    command.price = 1;
+    expect(extreme, command, RiskReject::None);
+}
 } // namespace
 
 int main() {
@@ -142,7 +178,8 @@ int main() {
         command_envelope();
         quantity_limits();
         integer_price_band();
-        std::cout << "PASS risk configuration, envelope, quantity, and integer price band\n";
+        notional_without_overflow();
+        std::cout << "PASS risk validation and overflow-safe integer notional limits\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL " << error.what() << '\n';
