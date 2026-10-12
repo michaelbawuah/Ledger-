@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Check local Markdown links and images without fetching external URLs."""
+import argparse
+import os
 from pathlib import Path
 import re
+import sys
 from urllib.parse import unquote, urlsplit
 
 DEFINITION = re.compile(r"(?m)^ {0,3}\[([^\]\n]+)\]:[ \t]*(.+)$")
@@ -137,3 +140,52 @@ def check_document(path, root):
         elif not resolved.exists():
             issues.append(f"{path.relative_to(root)}:{line}: missing local target {target}")
     return sorted(issues)
+
+
+def skipped_directory(name):
+    return name in {".git", ".venv", "__pycache__", "node_modules", "build", "dist"} \
+        or name.startswith(("build-", "cmake-build-"))
+
+
+def markdown_files(root):
+    """Discover source documentation deterministically, excluding build output."""
+    root = Path(root).resolve()
+    if not root.is_dir():
+        raise ValueError(f"repository root is not a directory: {root}")
+    paths = []
+    for directory, children, files in os.walk(root, followlinks=False):
+        children[:] = sorted(name for name in children if not skipped_directory(name))
+        for name in sorted(files):
+            if name.lower().endswith(".md"):
+                paths.append(Path(directory) / name)
+    return sorted(paths)
+
+
+def check_repository(root, paths=None):
+    root = Path(root).resolve()
+    selected = markdown_files(root) if not paths else sorted({Path(path).resolve() for path in paths})
+    issues = []
+    for path in selected:
+        issues.extend(check_document(path, root))
+    return len(selected), sorted(issues)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("paths", nargs="*", type=Path, help="Optional Markdown files to check")
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1],
+                        help="Repository boundary (defaults to this script's repository)")
+    args = parser.parse_args(argv)
+    try:
+        count, issues = check_repository(args.root, args.paths)
+    except (OSError, ValueError) as error:
+        print(f"documentation check failed: {error}", file=sys.stderr)
+        return 1
+    for issue in issues:
+        print(issue, file=sys.stderr)
+    print(f"Checked {count} Markdown files; {len(issues)} local-link problems.")
+    return 1 if issues else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

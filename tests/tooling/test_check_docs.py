@@ -1,6 +1,8 @@
 """Offline Markdown-link checker behavior and filesystem boundary tests."""
 import importlib.util
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -96,6 +98,34 @@ class CodeExampleTests(DocumentFixture):
         path = self.document("[Web](https://invalid.example/no-page)\n"
                              "[Email](mailto:user@example.com)\n[CDN](//invalid.example/image.png)\n")
         self.assertEqual(checker.check_document(path, self.root), [])
+
+
+class RepositoryTests(DocumentFixture):
+    def test_discovery_skips_generated_build_and_cache_documents(self):
+        self.document("Source", "README.md")
+        self.document("Source")
+        for directory in ("build", "build-release", "cmake-build-debug", ".git", "__pycache__", "node_modules"):
+            folder = self.root / directory
+            folder.mkdir()
+            (folder / "generated.md").write_text("[Generated](missing.md)", encoding="utf-8")
+        count, issues = checker.check_repository(self.root)
+        self.assertEqual(count, 2)
+        self.assertEqual(issues, [])
+
+    def test_cli_checks_explicit_file_and_returns_failure_for_broken_link(self):
+        path = self.document("[Missing](missing.md)\n")
+        process = subprocess.run([sys.executable, str(SCRIPT), "--root", str(self.root), str(path)],
+                                 text=True, capture_output=True)
+        self.assertEqual(process.returncode, 1)
+        self.assertIn("missing local target", process.stderr)
+        self.assertIn("Checked 1 Markdown files; 1", process.stdout)
+
+    def test_cli_is_deterministic_and_accepts_committed_documentation(self):
+        command = [sys.executable, str(SCRIPT)]
+        first = subprocess.run(command, text=True, capture_output=True, check=True)
+        second = subprocess.run(command, text=True, capture_output=True, check=True)
+        self.assertEqual(first.stdout, second.stdout)
+        self.assertEqual(first.stderr, "")
 
 
 if __name__ == "__main__":
