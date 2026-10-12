@@ -1,0 +1,33 @@
+{
+  "workload": "synthetic_five_command_lifecycle_small_book",
+  "commands": 1000000,
+  "events": 2200000,
+  "trades": 400000,
+  "checksum": 880004400000,
+  "queue_capacity": 8,
+  "cpu_pinned": true,
+  "producer_cpu": 1,
+  "consumer_cpu": 2,
+  "producer_pin_success": true,
+  "consumer_pin_success": true,
+  "producer_full_retries": 62744012,
+  "consumer_empty_retries": 4990294,
+  "produced_commands": 1000000,
+  "consumed_commands": 1000000,
+  "consumer_work": 64,
+  "synthetic_work_checksum": 4569521573053077132,
+  "synthetic_work_method": "dependent_u64_xor_multiply_rotate_rounds_after_process",
+  "elapsed_seconds": 0.321322101,
+  "commands_per_second": 3112141.981,
+  "latency_samples": 10000,
+  "enqueue_attempt_to_core_process_ns": {
+    "min": 270,
+    "mean": 2748.2344,
+    "p50": 1523,
+    "p90": 4762,
+    "p99": 5714,
+    "p999": 21938,
+    "max": 212785
+  },
+  "study_run": 1
+}
