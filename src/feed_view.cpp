@@ -26,4 +26,11 @@ bool FeedView::parse(std::span<const std::byte> bytes, FeedView& out,
     return true;
 }
 
+bool FeedView::read(std::size_t index, Command& out) const noexcept {
+    if (!valid_ || index >= size()) return false;
+    // index < payload.size() / record_size proves both multiplication and the
+    // entire record range are representable and within the borrowed span.
+    return decode_record(records_.subspan(index * feed_record_size, feed_record_size), out);
+}
+
 }
