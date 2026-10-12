@@ -131,9 +131,9 @@ struct Counts {
     std::uint64_t commands{}, reports{}, trades{}, applied{}, rejected{}, checkpoints{};
 };
 void run_seed(std::uint64_t seed, const Options& options, Counts& counts) {
-    FastBook fast{config, true}, linear{config, false}; ReferenceBook reference{config};
-    std::array<Event, required_event_capacity(config.max_orders)> fast_storage{}, reference_storage{}, linear_storage{};
-    EventBuffer fast_output{fast_storage}, reference_output{reference_storage}, linear_output{linear_storage};
+    FastBook fast{config, true, true}, linear{config, false, false}, fok_linear{config, true, false}; ReferenceBook reference{config};
+    std::array<Event, required_event_capacity(config.max_orders)> fast_storage{}, reference_storage{}, linear_storage{}, fok_linear_storage{};
+    EventBuffer fast_output{fast_storage}, reference_output{reference_storage}, linear_output{linear_storage}, fok_linear_output{fok_linear_storage};
     std::array<Command, 16> history{}; auto state = seed;
     for (std::uint64_t index = 0; index < options.orders; ++index) {
         const auto command = generate(state, index); history[index % history.size()] = command;
@@ -150,6 +150,11 @@ void run_seed(std::uint64_t seed, const Options& options, Counts& counts) {
                 linear.size() != reference.size() || linear.resting_quantity() != reference.resting_quantity() || linear.best_bid() != reference.best_bid() ||
                 linear.best_ask() != reference.best_ask() || !observable_invariants(linear))
                 failure("linear search mismatch", seed, command, history, linear_output.events(), reference_output.events());
+            const auto fok_result = fok_linear.process(command, fok_linear_output);
+            if (fok_result != reference_result || !equal_reports(fok_linear_output.events(), reference_output.events()) || fok_linear.stats() != reference.stats() ||
+                fok_linear.size() != reference.size() || fok_linear.resting_quantity() != reference.resting_quantity() || fok_linear.best_bid() != reference.best_bid() ||
+                fok_linear.best_ask() != reference.best_ask() || !observable_invariants(fok_linear))
+                failure("linear FOK preflight mismatch", seed, command, history, fok_linear_output.events(), reference_output.events());
         }
         for (const auto& event : fast_output.events()) {
             if (event.sequence != command.sequence) fail("event sequence mismatch");
@@ -165,9 +170,9 @@ void run_seed(std::uint64_t seed, const Options& options, Counts& counts) {
         else if (fast_result == ProcessResult::Rejected) ++counts.rejected;
         else fail("unexpected OutputFull with sufficient storage");
         if ((index + 1) % options.checkpoint == 0 || index + 1 == options.orders) {
-            if (!fast.check_invariants() || !reference.check_invariants() || (options.linear && !linear.check_invariants())) fail("full structural invariant violation");
+            if (!fast.check_invariants() || !reference.check_invariants() || (options.linear && (!linear.check_invariants() || !fok_linear.check_invariants()))) fail("full structural invariant violation");
             const auto expected = reference.snapshot();
-            if (fast.snapshot() != expected || (options.linear && linear.snapshot() != expected)) fail("full FIFO/level/statistics snapshot mismatch");
+            if (fast.snapshot() != expected || (options.linear && (linear.snapshot() != expected || fok_linear.snapshot() != expected))) fail("full FIFO/level/statistics snapshot mismatch");
             ++counts.checkpoints;
         }
     }
@@ -180,6 +185,7 @@ void report(std::ostream& out, const Options& options, const Counts& counts, dou
         << "  \"trades_compared\": " << counts.trades << ",\n  \"applied_commands\": " << counts.applied << ",\n"
         << "  \"rejected_commands\": " << counts.rejected << ",\n  \"structural_checkpoints\": " << counts.checkpoints << ",\n"
         << "  \"checkpoint_interval\": " << options.checkpoint << ",\n  \"linear_variant_compared\": " << (options.linear ? "true" : "false") << ",\n"
+        << "  \"linear_fok_variant_compared\": " << (options.linear ? "true" : "false") << ",\n"
         << "  \"per_command_checks\": [\"process_result\", \"all_event_fields\", \"statistics\", \"size\", \"resting_quantity\", \"best_quotes\", \"quantity_conservation\", \"uncrossed_quotes\"],\n"
         << "  \"checkpoint_checks\": [\"full_structural_invariants\", \"full_FIFO_orders\", \"all_levels\", \"all_statistics\"],\n"
         << "  \"elapsed_seconds\": " << std::fixed << std::setprecision(6) << seconds << "\n}\n";

@@ -260,7 +260,7 @@ int main(int argc, char** argv) {
                                          config, runs, warmup, raw, run_csv, expected, have_expected);
         const auto bitmap = benchmark("fast-bitmap", [&] { return ledger::FastBook(config, true); }, commands,
                                       config, runs, warmup, raw, run_csv, expected, have_expected);
-        const auto linear = benchmark("fast-linear", [&] { return ledger::FastBook(config, false); }, commands,
+        const auto linear = benchmark("fast-linear", [&] { return ledger::FastBook(config, false, false); }, commands,
                                       config, runs, warmup, raw, run_csv, expected, have_expected);
         raw.close(); run_csv.close();
         if (!raw || !run_csv) throw std::runtime_error("failed to write benchmark CSV files");
