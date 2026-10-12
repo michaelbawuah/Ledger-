@@ -3,6 +3,7 @@
 import csv
 import json
 import re
+from collections import defaultdict
 from decimal import Decimal
 from pathlib import Path
 
@@ -114,3 +115,67 @@ def read_csv(path, columns):
         require(None not in row and all(value is not None for value in row.values()),
                 f"{Path(path).name}:{index}: inconsistent column count")
     return rows
+
+
+def expected_runs(summary):
+    return {(engine, run) for engine in ENGINES for run in range(1, summary["runs"] + 1)}
+
+
+def read_runs(path, summary):
+    runs = {}
+    for row in read_csv(path, RUN_COLUMNS):
+        engine = row["engine"]
+        require(engine in ENGINES, f"runs: unknown engine {engine}")
+        run = csv_integer(row["run"], "run", 1)
+        key = (engine, run)
+        require(key not in runs, f"runs: duplicate engine/run {key}")
+        values = {}
+        for field in RUN_COLUMNS[2:]:
+            if field == "commands_per_second":
+                try:
+                    values[field] = positive_decimal(Decimal(row[field]), f"{key}.{field}")
+                except ArithmeticError as error:
+                    raise VerificationError(f"{key}.{field}: invalid decimal") from error
+            else:
+                values[field] = csv_integer(row[field], f"{key}.{field}")
+        require(values["commands"] == summary["commands"], f"{key}: command count differs from summary")
+        require(values["throughput_total_ns"] > 0, f"{key}: elapsed time must be positive")
+        runs[key] = values
+    require(set(runs) == expected_runs(summary), "runs: incomplete or unexpected engine/run set")
+    return runs
+
+
+def nearest_rank(histogram, numerator, denominator):
+    """Return ceil(N * fraction)'s sample without expanding frequency counts."""
+    require(0 < numerator <= denominator, "percentile: invalid fraction")
+    total = sum(histogram.values())
+    require(total > 0, "percentile: empty histogram")
+    rank = (total * numerator + denominator - 1) // denominator
+    cumulative = 0
+    for latency, count in sorted(histogram.items()):
+        cumulative += count
+        if cumulative >= rank:
+            return latency
+    raise VerificationError("percentile: inconsistent histogram")
+
+
+def read_histograms(path, summary, runs):
+    histograms = defaultdict(dict)
+    for row in read_csv(path, HISTOGRAM_COLUMNS):
+        engine = row["engine"]
+        require(engine in ENGINES, f"histogram: unknown engine {engine}")
+        key = (engine, csv_integer(row["run"], "histogram.run", 1))
+        require(key in runs, f"histogram: unexpected engine/run {key}")
+        latency = csv_integer(row["latency_ns"], f"{key}.latency_ns")
+        count = csv_integer(row["count"], f"{key}.count", 1)
+        require(latency not in histograms[key], f"histogram: duplicate bin {key}/{latency}")
+        histograms[key][latency] = count
+    require(set(histograms) == expected_runs(summary), "histogram: incomplete engine/run set")
+    for key, histogram in histograms.items():
+        require(sum(histogram.values()) == summary["commands"], f"{key}: histogram count differs from commands")
+        for field, numerator, denominator in (("p50_ns", 50, 100), ("p99_ns", 99, 100),
+                                               ("p999_ns", 999, 1000)):
+            require(nearest_rank(histogram, numerator, denominator) == runs[key][field],
+                    f"{key}: {field} differs from exact frequencies")
+        require(max(histogram) == runs[key]["max_ns"], f"{key}: maximum differs from exact frequencies")
+    return dict(histograms)

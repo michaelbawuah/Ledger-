@@ -31,6 +31,19 @@ def fixture_summary():
                 engines={engine: copy.deepcopy(metrics) for engine in verifier.ENGINES})
 
 
+def fixture_rows():
+    runs, histogram = [], []
+    for engine in sorted(verifier.ENGINES):
+        for run in range(1, 4):
+            runs.append(dict(engine=engine, run=run, commands=1000, throughput_total_ns=1000000,
+                             commands_per_second=1000000, p50_ns=10, p99_ns=10, p999_ns=20,
+                             max_ns=30, rejected_commands=0, events=2000, trades=10,
+                             event_checksum=2**64 - 1, trade_checksum=42))
+            for latency, count in ((10, 990), (20, 9), (30, 1)):
+                histogram.append(dict(engine=engine, run=run, latency_ns=latency, count=count))
+    return runs, histogram
+
+
 class SchemaTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -40,6 +53,14 @@ class SchemaTests(unittest.TestCase):
     def write_summary(self, value):
         path = self.root / "summary.json"
         path.write_text(json.dumps(value), encoding="utf-8")
+        return path
+
+    def write_csv(self, name, columns, rows):
+        path = self.root / name
+        with path.open("w", encoding="utf-8", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=columns)
+            writer.writeheader()
+            writer.writerows(rows)
         return path
 
     def test_accepts_schema_and_preserves_uint64_checksum(self):
@@ -77,6 +98,47 @@ class SchemaTests(unittest.TestCase):
             path.write_text(text, encoding="utf-8")
             with self.assertRaises(verifier.VerificationError):
                 verifier.read_csv(path, verifier.HISTOGRAM_COLUMNS)
+
+
+class FrequencyTests(SchemaTests):
+    def evidence(self, run_rows=None, hist_rows=None):
+        summary = fixture_summary()
+        original_runs, original_hist = fixture_rows()
+        runs = verifier.read_runs(self.write_csv("runs.csv", verifier.RUN_COLUMNS,
+                                                original_runs if run_rows is None else run_rows), summary)
+        return verifier.read_histograms(self.write_csv("hist.csv", verifier.HISTOGRAM_COLUMNS,
+                                                       original_hist if hist_rows is None else hist_rows),
+                                        summary, runs)
+
+    def test_reconstructs_nearest_rank_without_expanding_samples(self):
+        result = self.evidence()
+        self.assertEqual(verifier.nearest_rank(result[("reference", 1)], 999, 1000), 20)
+        self.assertEqual(verifier.nearest_rank({7: 10**80, 9: 1}, 99, 100), 7)
+
+    def test_rejects_duplicate_and_missing_runs(self):
+        runs, _ = fixture_rows()
+        for tampered in (runs[:-1], runs + [runs[0]]):
+            with self.assertRaises(verifier.VerificationError):
+                self.evidence(run_rows=tampered)
+
+    def test_rejects_duplicate_missing_and_zero_count_bins(self):
+        _, histogram = fixture_rows()
+        zero = copy.deepcopy(histogram)
+        zero[0]["count"] = 0
+        for tampered in (histogram + [histogram[0]], histogram[:-3], zero):
+            with self.assertRaises(verifier.VerificationError):
+                self.evidence(hist_rows=tampered)
+
+    def test_rejects_count_percentile_and_maximum_tampering(self):
+        for field, replacement in (("count", 991), ("latency_ns", 11)):
+            _, histogram = fixture_rows()
+            histogram[0][field] = replacement
+            with self.assertRaises(verifier.VerificationError):
+                self.evidence(hist_rows=histogram)
+        runs, _ = fixture_rows()
+        runs[0]["max_ns"] = 31
+        with self.assertRaises(verifier.VerificationError):
+            self.evidence(run_rows=runs)
 
 
 if __name__ == "__main__":
