@@ -1,5 +1,6 @@
 #include "ledger/id_index.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -114,6 +115,55 @@ void collision_cluster_deletion() {
     }
 }
 
+void wrapped_clusters_and_mixed_home_buckets() {
+    constexpr std::uint32_t max_orders = 6;
+    IdIndex shape{max_orders};
+    const auto capacity = shape.entries().size();
+    const auto home = capacity - 2;
+    const auto keys = colliding_keys(max_orders, home, max_orders);
+    std::vector<std::size_t> erase_order{0, 1, 2, 3, 4, 5};
+    do {
+        IdIndex index{max_orders};
+        Oracle oracle;
+        for (Slot slot = 0; slot < max_orders; ++slot) {
+            index.insert(keys[slot], slot);
+            oracle.emplace(keys[slot], slot);
+            require(index.entries()[(home + slot) % capacity].id == keys[slot], "fixture did not wrap");
+        }
+        for (const auto victim : erase_order) {
+            require(index.erase(keys[victim]), "wrapped cluster erase");
+            oracle.erase(keys[victim]);
+            require(index.find(keys[victim]) == no_slot, "wrapped erased ID survived");
+            verify_index(index, oracle);
+        }
+        for (Slot slot = max_orders; slot > 0; --slot) {
+            index.insert(keys[slot - 1], slot - 1);
+            oracle.emplace(keys[slot - 1], slot - 1);
+        }
+        verify_index(index, oracle);
+    } while (std::next_permutation(erase_order.begin(), erase_order.end()));
+
+    // A backward shift must skip entries already at home, while moving a later
+    // displaced key across the skipped entries and the physical table boundary.
+    const auto home_keys = colliding_keys(max_orders, home, 2);
+    const auto next_key = colliding_keys(max_orders, home + 1, 1).front();
+    const auto zero_key = colliding_keys(max_orders, 0, 1).front();
+    IdIndex mixed{max_orders};
+    Oracle oracle{{home_keys[0], 10}, {next_key, 11}, {zero_key, 12}, {home_keys[1], 13}};
+    mixed.insert(home_keys[0], 10);
+    mixed.insert(next_key, 11);
+    mixed.insert(zero_key, 12);
+    mixed.insert(home_keys[1], 13);
+    verify_index(mixed, oracle);
+    require(mixed.erase(home_keys[0]), "mixed-home head erase");
+    oracle.erase(home_keys[0]);
+    verify_index(mixed, oracle);
+    require(mixed.entries()[home].id == home_keys[1], "displaced mixed-home key was not shifted");
+    require(mixed.entries()[home + 1].id == next_key && mixed.entries()[0].id == zero_key,
+            "backshift moved keys ahead of their home buckets");
+    require(mixed.entries()[1].id == 0, "mixed-home terminal hole was not cleared");
+}
+
 template <class Function> void run(const char* name, Function function) {
     function();
     std::cout << "PASS " << name << '\n';
@@ -124,6 +174,7 @@ int main() {
     try {
         run("capacity_rounding_and_full_width_keys", capacity_rounding_and_full_width_keys);
         run("collision_cluster_deletion", collision_cluster_deletion);
+        run("wrapped_clusters_and_mixed_home_buckets", wrapped_clusters_and_mixed_home_buckets);
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL index suite: " << error.what() << '\n';
