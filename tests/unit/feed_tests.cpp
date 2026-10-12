@@ -51,6 +51,7 @@ int main() {
         rejects([&] { (void)read_commands(file, 2); });
         std::ifstream stream(file, std::ios::binary);
         const std::vector<char> original{std::istreambuf_iterator<char>(stream), {}};
+        stream.close(); // Windows cannot rewrite/remove a file with a live reader.
         for (const std::size_t offset : {0u, 8u, 10u, 12u, 14u, 24u}) {
             auto bytes = original; bytes[offset] ^= char(127); bytes_to_file(file, bytes);
             rejects([&] { (void)read_commands(file); });
@@ -80,7 +81,8 @@ int main() {
         std::cout << "PASS feed roundtrip, endian golden bytes, malformed headers/records, output atomicity, 50000 seeded mutations\n";
         return 0;
     } catch (const std::exception& error) {
-        std::filesystem::remove_all(directory);
+        std::error_code ignored;
+        std::filesystem::remove_all(directory, ignored);
         std::cerr << "FAIL " << error.what() << '\n'; return 1;
     }
 }
