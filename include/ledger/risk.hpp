@@ -16,6 +16,26 @@ struct RiskConfig {
     bool operator==(const RiskConfig&) const = default;
 };
 
+struct RiskContext {
+    std::int64_t position{};
+    Price market_valuation_price{};
+    bool operator==(const RiskContext&) const = default;
+};
+
+enum class RiskReject : std::uint8_t {
+    None, InvalidAction, InvalidSide, InvalidTimeInForce, InvalidId,
+};
+
+struct RiskDecision {
+    RiskReject reason{RiskReject::None};
+    std::int64_t projected_inventory{};
+    Price valuation_price{};
+    std::uint64_t order_notional{};
+    bool approved() const noexcept { return reason == RiskReject::None; }
+    explicit operator bool() const noexcept { return approved(); }
+    bool operator==(const RiskDecision&) const = default;
+};
+
 // Construction is the startup validation boundary. Decisions will not throw.
 class RiskPolicy {
 public:
@@ -28,6 +48,16 @@ public:
     }
 
     const RiskConfig& config() const noexcept { return config_; }
+
+    RiskDecision evaluate(const Command& command, const RiskContext& context = {}) const noexcept {
+        if (command.action > Action::Replace) return {RiskReject::InvalidAction};
+        if (command.side > Side::Sell) return {RiskReject::InvalidSide};
+        if (command.tif > TimeInForce::FOK) return {RiskReject::InvalidTimeInForce};
+        if (command.id == 0) return {RiskReject::InvalidId};
+        // A valid cancel must remain possible even when exposure exceeds limits.
+        if (command.action == Action::Cancel) return {RiskReject::None, context.position};
+        return {RiskReject::None, context.position};
+    }
 
 private:
     const RiskConfig config_;
