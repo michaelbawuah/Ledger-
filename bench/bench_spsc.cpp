@@ -162,8 +162,16 @@ void run_benchmark(const Options& options) {
     constexpr std::array<std::uint64_t, 5> partial_events{0, 1, 5, 6, 7};
     const auto expected_trades = (commands / 5) * 2 + (commands % 5 >= 2 ? 1 : 0);
     const auto expected_events = (commands / 5) * 11 + partial_events[commands % 5];
+    // One complete lifecycle contributes 11 report IDs plus quantities; cycle
+    // j (zero-based, IDs starting at 4j+1) sums to 44(j+1).
+    const auto cycles = commands / 5;
+    std::uint64_t expected_checksum = 22 * cycles * (cycles + 1);
+    constexpr std::array<std::uint64_t, 5> phase_id_counts{1, 4, 1, 1, 4};
+    constexpr std::array<std::uint64_t, 5> phase_offsets{3, 11, 2, 5, 23};
+    for (std::uint64_t phase = 0; phase < commands % 5; ++phase)
+        expected_checksum += phase_id_counts[phase] * (4 * cycles) + phase_offsets[phase];
     if (rejected != 0 || !queue.empty() || produced != commands || consumed != commands
-        || trades != expected_trades || events != expected_events)
+        || trades != expected_trades || events != expected_events || checksum != expected_checksum)
         throw std::runtime_error("benchmark workload failed validation");
     std::sort(latency.begin(), latency.end());
     std::cout << std::setprecision(10)
