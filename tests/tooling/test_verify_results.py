@@ -183,5 +183,45 @@ class MetricTests(FileFixture):
         self.metrics(rows=rows)
 
 
+class AccountingTests(FileFixture):
+    def accounting(self, summary=None, rows=None):
+        summary = fixture_summary() if summary is None else summary
+        verifier.read_summary(self.write_summary(summary))
+        original, _ = fixture_rows()
+        runs = verifier.read_runs(self.write_csv("runs.csv", verifier.RUN_COLUMNS,
+                                                original if rows is None else rows), summary)
+        verifier.verify_accounting(summary, runs)
+
+    def test_accepts_matching_counts_and_uint64_checksums(self):
+        self.accounting()
+
+    def test_rejects_checksum_and_event_count_tampering(self):
+        for field in ("event_checksum", "trade_checksum", "events", "trades", "rejected_commands"):
+            rows, _ = fixture_rows()
+            rows[0][field] -= 1 if rows[0][field] else -1
+            with self.assertRaises(verifier.VerificationError):
+                self.accounting(rows=rows)
+
+    def test_rejects_cross_engine_final_state_and_capacity_drift(self):
+        for tamper in ("state", "capacity"):
+            summary = fixture_summary()
+            if tamper == "state":
+                summary["engines"]["fast-bitmap"]["live_orders_final"] = 3
+            else:
+                summary["generated_peak_live_orders"] = 8193
+            with self.assertRaises(verifier.VerificationError):
+                self.accounting(summary=summary)
+
+    def test_rejects_metadata_types_and_integer_overflow(self):
+        mutations = (("machine", "logical_cpus", True), ("clock", "steady", False),
+                     ("compiler", "ndebug", 1), ("config", "max_orders", 2**64),
+                     ("clock", "period_denominator", 0))
+        for section, field, replacement in mutations:
+            summary = fixture_summary()
+            summary[section][field] = replacement
+            with self.assertRaises(verifier.VerificationError):
+                self.accounting(summary=summary)
+
+
 if __name__ == "__main__":
     unittest.main()

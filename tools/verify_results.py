@@ -43,12 +43,14 @@ def exact_keys(value, expected, name):
 
 def integer(value, name, minimum=0):
     require(type(value) is int and value >= minimum, f"{name}: expected integer >= {minimum}")
+    require(value <= 2**64 - 1, f"{name}: exceeds uint64 range")
     return value
 
 
 def csv_integer(value, name, minimum=0):
     require(isinstance(value, str) and re.fullmatch(r"[0-9]+", value) is not None,
             f"{name}: expected a decimal integer")
+    require(len(value) <= 20, f"{name}: exceeds uint64 decimal width")
     return integer(int(value), name, minimum)
 
 
@@ -95,6 +97,7 @@ def read_summary(path):
     for key, value in summary["mix"].items():
         integer(value, f"mix.{key}")
     require(sum(summary["mix"].values()) == summary["commands"], "mix: counts do not sum to commands")
+    validate_metadata(summary)
     exact_keys(summary["engines"], ENGINES, "engines")
     for engine, metrics in summary["engines"].items():
         exact_keys(metrics, ENGINE_KEYS, engine)
@@ -104,6 +107,26 @@ def read_summary(path):
             else:
                 integer(value, f"{engine}.{key}")
     return summary
+
+
+def validate_metadata(summary):
+    machine = summary["machine"]
+    exact_keys(machine, {"system", "cpu_model", "logical_cpus", "affinity_cpus", "memory", "governor_cpu0"}, "machine")
+    integer(machine["logical_cpus"], "machine.logical_cpus", 1)
+    for field in ("system", "cpu_model", "affinity_cpus", "memory", "governor_cpu0"):
+        require(isinstance(machine[field], str), f"machine.{field}: expected text")
+    compiler = summary["compiler"]
+    exact_keys(compiler, {"version", "flags", "optimization_enabled", "ndebug"}, "compiler")
+    for field in ("version", "flags"):
+        require(isinstance(compiler[field], str), f"compiler.{field}: expected text")
+    for field in ("optimization_enabled", "ndebug"):
+        require(type(compiler[field]) is bool, f"compiler.{field}: expected boolean")
+    clock = summary["clock"]
+    exact_keys(clock, {"steady", "period_numerator", "period_denominator", "median_empty_pair_ns"}, "clock")
+    require(type(clock["steady"]) is bool and clock["steady"], "clock.steady: requires a steady clock")
+    for field in ("period_numerator", "period_denominator"):
+        integer(clock[field], f"clock.{field}", 1)
+    integer(clock["median_empty_pair_ns"], "clock.median_empty_pair_ns")
 
 
 def read_csv(path, columns):
@@ -230,3 +253,23 @@ def verify_metrics(summary, runs):
                 Decimal(engines["fast-linear"]["median_p999_ns"] - engines["fast-bitmap"]["median_p999_ns"])
                 / engines["fast-linear"]["median_p999_ns"] * 100),
         }
+
+
+def verify_accounting(summary, runs):
+    """Cross-check reported execution counts/checksums and final live state."""
+    fields = ("rejected_commands", "events", "trades", "event_checksum", "trade_checksum")
+    reference = summary["engines"]["reference"]
+    for engine, metrics in summary["engines"].items():
+        require(metrics["rejected_commands"] <= summary["commands"], f"{engine}: rejects exceed commands")
+        require(metrics["trades"] <= metrics["events"], f"{engine}: trades exceed events")
+        require(metrics["live_orders_final"] <= summary["generated_peak_live_orders"],
+                f"{engine}: final live orders exceed generated peak")
+        for field in (*fields, "live_orders_final"):
+            require(metrics[field] == reference[field], f"{engine}.{field}: differs from reference")
+    require(summary["generated_peak_live_orders"] <= summary["config"]["max_orders"],
+            "generated peak live orders exceed configured capacity")
+    for key, values in runs.items():
+        engine = key[0]
+        for field in fields:
+            require(values[field] == summary["engines"][engine][field],
+                    f"{key}.{field}: differs from engine summary")
