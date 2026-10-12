@@ -1,9 +1,11 @@
 #include "ledger/pool.hpp"
 
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <vector>
 
 namespace {
 using ledger::detail::OrderPool;
@@ -71,6 +73,44 @@ void lifo_recycling_and_payload_reset() {
     }
 }
 
+void verify_partition(const OrderPool& pool, const std::vector<bool>& expected_live) {
+    require(expected_live.size() == pool.capacity(), "oracle capacity mismatch");
+    std::size_t count = 0;
+    for (Slot slot = 0; slot < expected_live.size(); ++slot) {
+        require(pool[slot].live == expected_live[slot], "pool ownership differs from slot oracle");
+        count += expected_live[slot] ? 1 : 0;
+    }
+    require(pool.size() == count, "live count differs from oracle");
+    require(pool.full() == (count == pool.capacity()), "full flag differs from oracle");
+    require(pool.check_invariants(), "live/free partition diagnostic");
+}
+
+void exhaustive_release_permutations() {
+    for (Slot capacity = 1; capacity <= 6; ++capacity) {
+        std::vector<Slot> release_order(capacity);
+        for (Slot slot = 0; slot < capacity; ++slot) release_order[slot] = slot;
+        do {
+            OrderPool pool{capacity};
+            std::vector<bool> live(capacity, false);
+            for (Slot slot = 0; slot < capacity; ++slot) {
+                require(pool.acquire() == slot, "permutation initial slot ownership");
+                live[slot] = true;
+            }
+            for (const auto slot : release_order) {
+                pool.release(slot);
+                live[slot] = false;
+                verify_partition(pool, live);
+            }
+            for (auto iterator = release_order.rbegin(); iterator != release_order.rend(); ++iterator) {
+                const auto slot = pool.acquire();
+                require(slot == *iterator && !live[slot], "permutation recycle uniqueness");
+                live[slot] = true;
+                verify_partition(pool, live);
+            }
+        } while (std::next_permutation(release_order.begin(), release_order.end()));
+    }
+}
+
 template <class Function> void run(const char* name, Function function) {
     function();
     std::cout << "PASS " << name << '\n';
@@ -81,6 +121,7 @@ int main() {
     try {
         run("empty_and_exhaustion", empty_and_exhaustion);
         run("lifo_recycling_and_payload_reset", lifo_recycling_and_payload_reset);
+        run("exhaustive_release_permutations", exhaustive_release_permutations);
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL pool suite: " << error.what() << '\n';
