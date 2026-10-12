@@ -38,3 +38,49 @@ Build and run from the repository root:
 c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Iinclude tests/unit/pool_tests.cpp -o pool_tests
 ./pool_tests
 ```
+
+## Order-ID index
+
+The ID index uses an open-addressed table rounded up to a power of two, with at
+least twice the configured maximum live order count. A zero key marks an empty
+entry. Nonzero IDs use all 64 bits, including high-bit-only values and
+`UINT64_MAX`. Lookup and erase stop at the first empty entry; lookup of zero
+returns `no_slot` and erase of zero returns false.
+
+`insert(id, slot)` requires a nonzero absent ID, a nonsentinel slot, and available
+capacity. It is an unchecked internal insertion primitive: duplicate IDs,
+sentinel IDs, and overfilling are caller errors. `FastBook` enforces these
+preconditions. A failed erase of an absent ID does not alter the table.
+
+Erasure closes a probe-cluster hole by moving only displaced entries whose probe
+path crosses that hole. Entries already at their home bucket are skipped; later
+entries can still move past them. The distance calculation wraps around the
+physical end of the table. The final hole is reset to an empty entry, avoiding
+tombstones that could accumulate during repeated cancellations.
+
+The standalone `tests/unit/index_tests.cpp` suite covers:
+
+- Table-size rounding and zero-sentinel lookup/erase.
+- High-bit IDs, common low halves with different high halves, and maximum IDs.
+- Head, middle, and tail deletion in a cluster found by black-box probing of the
+  actual table; the fixture does not duplicate the hash algorithm.
+- All 720 deletion orders for a wrapped six-key cluster and a mixed-home cluster
+  that must skip home-position entries before moving a displaced entry.
+- 800,000 erase/insert cycles at the configured maximum population, including
+  repeated erase, unrelated retained lookups, and full-table audits.
+- 50,000 operations linking a real pool and index, checking that each ID resolves
+  to its currently owned live slot after repeated release/reacquisition.
+
+An independent `std::unordered_map` oracle checks every expected lookup. Physical
+entry audits reject duplicate/unexpected IDs and require empty entries to have
+`no_slot`; the implementation's invariant checker also runs at checkpoints.
+Oracle containers and diagnostic checks run outside any measured hot path.
+
+```sh
+c++ -std=c++23 -O2 -Wall -Wextra -Wpedantic -Iinclude tests/unit/index_tests.cpp -o index_tests
+./index_tests
+```
+
+These suites test component semantics and ownership, not benchmark timing. The
+separate `memory_tests` target counts C++ allocations during book processing;
+construction, oracle maintenance, and diagnostics are deliberately excluded.

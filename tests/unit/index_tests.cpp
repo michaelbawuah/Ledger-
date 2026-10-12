@@ -210,6 +210,63 @@ void long_running_half_full_churn() {
     }
 }
 
+void pool_index_slot_ownership_churn() {
+    constexpr Slot capacity = 97;
+    ledger::detail::OrderPool pool{capacity};
+    IdIndex index{capacity};
+    Oracle oracle;
+    std::vector<OrderId> owners(capacity, 0);
+    std::uint64_t random = UINT64_C(0xa589137f0214edac);
+    auto verify = [&] {
+        verify_index(index, oracle);
+        require(pool.size() == oracle.size() && pool.check_invariants(), "integrated pool cardinality/partition");
+        for (Slot slot = 0; slot < capacity; ++slot) {
+            require(pool[slot].live == (owners[slot] != 0), "integrated live slot ownership");
+            require(pool[slot].id == owners[slot], "integrated slot payload ownership");
+            if (owners[slot]) {
+                require(oracle.at(owners[slot]) == slot && index.find(owners[slot]) == slot,
+                        "integrated ID resolved to a recycled or different slot");
+            }
+        }
+    };
+    auto insert = [&] {
+        OrderId id{};
+        do { id = random_step(random); } while (!id || oracle.contains(id));
+        const auto slot = pool.acquire();
+        require(slot != no_slot && !owners[slot], "integrated acquisition ownership");
+        pool[slot].id = id;
+        owners[slot] = id;
+        index.insert(id, slot);
+        oracle.emplace(id, slot);
+    };
+    for (Slot count = 0; count < capacity; ++count) insert();
+    verify();
+    require(pool.acquire() == no_slot && index.size() == capacity, "integrated exhaustion mutated index");
+    for (std::uint64_t operation = 0; operation < 50000; ++operation) {
+        const auto slot = static_cast<Slot>(random_step(random) % capacity);
+        if (owners[slot]) {
+            const auto id = owners[slot];
+            require(index.find(id) == slot && index.erase(id), "integrated erase lost a live order");
+            oracle.erase(id);
+            pool.release(slot);
+            owners[slot] = 0;
+            require(index.find(id) == no_slot, "integrated released ID points at reusable slot");
+        } else {
+            insert();
+        }
+        if (operation % 97 == 0) verify();
+    }
+    verify();
+    for (Slot slot = 0; slot < capacity; ++slot) if (owners[slot]) {
+        require(index.erase(owners[slot]), "integrated final erase");
+        oracle.erase(owners[slot]);
+        pool.release(slot);
+        owners[slot] = 0;
+    }
+    verify();
+    require(pool.size() == 0 && index.size() == 0, "integrated final drain");
+}
+
 template <class Function> void run(const char* name, Function function) {
     function();
     std::cout << "PASS " << name << '\n';
@@ -222,6 +279,7 @@ int main() {
         run("collision_cluster_deletion", collision_cluster_deletion);
         run("wrapped_clusters_and_mixed_home_buckets", wrapped_clusters_and_mixed_home_buckets);
         run("long_running_half_full_churn", long_running_half_full_churn);
+        run("pool_index_slot_ownership_churn", pool_index_slot_ownership_churn);
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL index suite: " << error.what() << '\n';
