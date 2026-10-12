@@ -452,5 +452,79 @@ class PlotManifestTests(FixtureMixin, unittest.TestCase):
             v.verify_plot_manifest(self.path, self.loaded)
 
 
+    def trace_fixture(self):
+        directory = self.root / "strategy"
+        directory.mkdir(exist_ok=True)
+        self.trace_path = directory / "trace.csv"
+        self.trace_rows = [dict(zip(v.TRACE_COLUMNS, row)) for row in (
+            (0, 100, 0, 0, 0, 0, 0, 0),
+            (1, 100, 1, -101, -1, 1, 1, 1),
+            (2, 99, 0, -3, -3, 2, 2, 1))]
+        self.trace_summary = dict(steps=2, seed=42, inventory_limit_units=2,
+            max_abs_inventory_units=1, inventory_units=0, cash_tick_units=-3,
+            final_mid_ticks=99, mark_to_market_pnl_tick_units=-3,
+            maker_buy_units=1, maker_sell_units=1, maker_trade_events=2,
+            maker_filled_units=2, historical_backtest=False, live_trading=False,
+            fees_modeled=False, queue_position_model=False)
+        self.write_trace()
+        return directory
+
+    def write_trace(self):
+        self.trace_path.with_name("summary.json").write_text(json.dumps(self.trace_summary))
+        with self.trace_path.open("w", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=v.TRACE_COLUMNS)
+            writer.writeheader()
+            writer.writerows(self.trace_rows)
+
+    def test_strategy_trace_checks_negative_pnl_and_final_summary(self):
+        self.trace_fixture()
+        rows, report = v.verify_strategy_trace(self.trace_path)
+        self.assertEqual(report["final_pnl_tick_units"], -3)
+        self.assertEqual(len(rows), 3)
+
+    def test_rejects_strategy_accounting_step_quantity_and_limit_mutations(self):
+        for index, field, value in ((1, "pnl_tick_units", 1), (1, "cash_tick_units", -100),
+                                    (1, "step", 2), (1, "inventory_units", 3),
+                                    (1, "maker_trade_events", 2), (1, "maker_filled_units", 0),
+                                    (2, "max_abs_inventory_units", 2)):
+            self.trace_fixture()
+            self.trace_rows[index][field] = value
+            self.write_trace()
+            with self.assertRaises(v.VerificationError):
+                v.verify_strategy_trace(self.trace_path)
+        self.trace_fixture()
+        self.trace_summary["maker_sell_units"] = 2
+        self.write_trace()
+        with self.assertRaises(v.VerificationError):
+            v.verify_strategy_trace(self.trace_path)
+
+    def test_strategy_plot_source_gets_independent_trace_audit(self):
+        self.manifest()
+        self.trace_fixture()
+        source = "strategy/trace.csv"
+        self.m["sources"].append(dict(path=source, sha256=v.sha256(self.trace_path)))
+        self.m["plots"][0]["sources"].append(source)
+        self.m["plots"][0]["series"].append(dict(kind="csv_rows", source=source,
+            x="step", y=["pnl_tick_units"], filters={}, values=[[0, 0], [1, -1], [2, -3]]))
+        self.path.write_text(json.dumps(self.m))
+        report = v.verify_plot_manifest(self.path, self.loaded)
+        self.assertEqual(next(iter(report["trace_evidence_audits"].values()))["trace_rows"], 3)
+
+    def test_csv_rows_are_independently_sorted_by_declared_x_axis(self):
+        self.tables["depth.csv"][0]["orders"] = 1
+        self.tables["depth.csv"][0]["quantity"] = 1
+        another = dict(self.tables["depth.csv"][0], price=1)
+        self.tables["depth.csv"].insert(1, another)
+        self.write()
+        self.manifest()
+        source = str((self.study / "depth.csv").relative_to(self.root))
+        self.m["plots"][0]["series"].append(dict(kind="csv_rows", source=source,
+            x="price", y=["quantity"], filters={"sequence": 0, "side": "buy"},
+            values=[[1, 1], [2, 1]]))
+        self.path.write_text(json.dumps(self.m))
+        report = v.verify_plot_manifest(self.path, self.loaded)
+        self.assertEqual(report["checked_series"], 10)
+
+
 if __name__ == "__main__":
     unittest.main()

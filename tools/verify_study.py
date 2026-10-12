@@ -22,6 +22,7 @@ HISTOGRAM_COLUMNS = PREFIX + ("engine", "run", "latency_ns", "count")
 DIAGNOSTICS_COLUMNS = PREFIX + ("engine", "run", "action", "result", "fills", "levels_emptied", "latency_ns", "count")
 TIMELINE_COLUMNS = PREFIX + ("sequence", "live_orders", "resting_quantity", "best_bid", "best_ask", "trade_count")
 DEPTH_COLUMNS = PREFIX + ("sequence", "side", "price", "quantity", "orders")
+TRACE_COLUMNS = ("step", "mid_ticks", "inventory_units", "cash_tick_units", "pnl_tick_units", "maker_filled_units", "maker_trade_events", "max_abs_inventory_units")
 PROFILES = {"balanced", "cancel_heavy", "trade_storm", "replace_heavy", "sparse_fok", "rejection_stress"}
 ENGINES = {"reference", "fast-linear", "fast-bitmap", "fast-fok-linear"}
 ACTIONS = {"limit", "market", "cancel", "replace"}
@@ -390,6 +391,49 @@ def matches(row, filters):
     return True
 
 
+def verify_strategy_trace(path):
+    """Check the captured accounting trajectory without claiming trading returns."""
+    path = Path(path)
+    summary = read_json(path.with_name("summary.json"))
+    fields = ("steps", "seed", "inventory_limit_units", "max_abs_inventory_units", "inventory_units", "cash_tick_units", "final_mid_ticks", "mark_to_market_pnl_tick_units", "maker_buy_units", "maker_sell_units", "maker_trade_events", "maker_filled_units")
+    required_fields(summary, fields, "strategy summary")
+    for name in ("historical_backtest", "live_trading", "fees_modeled", "queue_position_model"):
+        require(summary.get(name) is False, f"strategy.{name}: synthetic capture must explicitly disclose false")
+    integer(summary["steps"], "strategy.steps", 1, 1_000_000)
+    for name in ("seed", "inventory_limit_units", "max_abs_inventory_units", "final_mid_ticks", "maker_buy_units", "maker_sell_units", "maker_trade_events", "maker_filled_units"):
+        integer(summary[name], f"strategy.{name}")
+    for name in ("inventory_units", "cash_tick_units", "mark_to_market_pnl_tick_units"):
+        integer(summary[name], f"strategy.{name}", -(2**63), 2**63 - 1)
+    rows = read_csv(path, TRACE_COLUMNS)
+    require(len(rows) == summary["steps"] + 1, "strategy trace: incomplete step count")
+    max_inventory = previous_units = previous_trades = previous_inventory = 0
+    for expected_step, row in enumerate(rows):
+        for name in TRACE_COLUMNS:
+            if name in {"inventory_units", "cash_tick_units", "pnl_tick_units"}:
+                require(re.fullmatch(r"-?[0-9]{1,20}", row[name]) is not None, f"strategy.{name}: invalid signed decimal")
+                row[name] = integer(int(row[name]), f"strategy.{name}", -(2**63), 2**63 - 1)
+            else:
+                row[name] = csv_integer(row[name], f"strategy.{name}")
+        require(row["step"] == expected_step and row["mid_ticks"] > 0, "strategy trace: unordered steps or invalid mark")
+        require(row["pnl_tick_units"] == row["cash_tick_units"] + row["inventory_units"] * row["mid_ticks"], "strategy trace: mark-to-market identity failed")
+        require(abs(row["inventory_units"]) <= summary["inventory_limit_units"], "strategy trace: inventory limit exceeded")
+        max_inventory = max(max_inventory, abs(row["inventory_units"]))
+        require(row["max_abs_inventory_units"] == max_inventory, "strategy trace: cumulative inventory maximum differs")
+        units, trades = row["maker_filled_units"], row["maker_trade_events"]
+        require(units >= previous_units and trades >= previous_trades, "strategy trace: decreasing fill/trade totals")
+        require(trades - previous_trades <= units - previous_units, "strategy trace: trade count exceeds filled units")
+        require(abs(row["inventory_units"] - previous_inventory) <= units - previous_units, "strategy trace: inventory change exceeds fills")
+        if expected_step == 0:
+            require(all(row[name] == 0 for name in ("inventory_units", "cash_tick_units", "pnl_tick_units", "maker_filled_units", "maker_trade_events", "max_abs_inventory_units")), "strategy trace: nonzero initial accounting")
+        previous_units, previous_trades, previous_inventory = units, trades, row["inventory_units"]
+    final = rows[-1]
+    mapping = {"step": "steps", "mid_ticks": "final_mid_ticks", "inventory_units": "inventory_units", "cash_tick_units": "cash_tick_units", "pnl_tick_units": "mark_to_market_pnl_tick_units", "maker_filled_units": "maker_filled_units", "maker_trade_events": "maker_trade_events", "max_abs_inventory_units": "max_abs_inventory_units"}
+    require(all(final[left] == summary[right] for left, right in mapping.items()), "strategy trace: final row differs from summary")
+    require(summary["maker_buy_units"] + summary["maker_sell_units"] == final["maker_filled_units"], "strategy summary: buy/sell totals differ from filled units")
+    require(summary["maker_buy_units"] - summary["maker_sell_units"] == final["inventory_units"], "strategy summary: buy/sell totals differ from inventory")
+    return rows, {"steps": summary["steps"], "trace_rows": len(rows), "final_pnl_tick_units": final["pnl_tick_units"], "source_sha256": {name: sha256(path.with_name(name)) for name in (path.name, "summary.json")}}
+
+
 def verify_plot_manifest(path, tables):
     path = Path(path).resolve()
     m = read_json(path)
@@ -424,6 +468,12 @@ def verify_plot_manifest(path, tables):
                     row[field] = csv_integer(row[field], f"core.{field}", 1 if field == "count" else 0)
             tables[source] = core_rows
             core_audits[str(source.parent)] = {"verified_latency_samples": core_report["verified_latency_samples"], "source_sha256": {name: sha256(source.parent / name) for name in ("summary.json", "runs.csv", "latency_histogram.csv")}}
+    trace_audits = {}
+    for source in sources:
+        if source.name == "trace.csv":
+            trace_rows, trace_report = verify_strategy_trace(source)
+            tables[source] = trace_rows
+            trace_audits[str(source.parent)] = trace_report
     checked = 0
     for plot in m["plots"]:
         required_fields(plot, ("path", "sources", "series"), "plot")
@@ -505,7 +555,7 @@ def verify_plot_manifest(path, tables):
                 require(location in plot_sources and location in tables, "plot: unaudited CSV series")
                 require(isinstance(series["y"], list) and isinstance(series["filters"], dict) and isinstance(series["values"], list), "plot: invalid CSV series fields")
                 columns = [series["x"], *series["y"]]
-                rows = [r for r in tables[location] if matches(r, series["filters"])]
+                rows = sorted([r for r in tables[location] if matches(r, series["filters"])], key=lambda row: row[series["x"]])
                 require(all(set(columns) <= set(r) for r in rows), "plot: unknown CSV axis")
                 expected = [[r[k] for k in columns] for r in rows]
                 require(len(series["values"]) == len(expected), "plot: CSV plotted row count differs")
@@ -555,7 +605,7 @@ def verify_plot_manifest(path, tables):
             else:
                 raise VerificationError(f"plot: unsupported series kind {kind}")
             checked += 1
-    return {"path": str(path), "source_files": len(sources), "figures": len(m["plots"]), "checked_series": checked, "sha256": sha256(path), "core_evidence_audits": core_audits}
+    return {"path": str(path), "source_files": len(sources), "figures": len(m["plots"]), "checked_series": checked, "sha256": sha256(path), "core_evidence_audits": core_audits, "trace_evidence_audits": trace_audits}
 
 
 LIMITATIONS = [
