@@ -1,4 +1,7 @@
-# Recorded results
+# Initial recorded results
+
+This packet preserves the original replay. The current core rebaseline and
+51-configuration analysis are in [performance-study.md](performance-study.md).
 
 These results were measured during this build on a shared Linux virtual host.
 They describe a synthetic matching workload, not live trading performance.

@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "capture_date_utc": "2026-10-12",
+  "tests": {
+    "gcc_native": {
+      "ctest_cases": 15,
+      "failures": 0,
+      "errors": 0,
+      "cases": [
+        "engine_semantics",
+        "allocation_free",
+        "spsc_stress",
+        "feed_roundtrip",
+        "differential_smoke",
+        "pool_verification",
+        "index_verification",
+        "feed_view_verification",
+        "risk_verification",
+        "fok_verification",
+        "study_workload_verification",
+        "study_observer_verification",
+        "evidence_validation",
+        "documentation_links",
+        "tooling_tamper_tests"
+      ]
+    },
+    "clang18_asan_ubsan": {
+      "ctest_cases": 15,
+      "failures": 0,
+      "errors": 0,
+      "cases": [
+        "engine_semantics",
+        "allocation_free",
+        "spsc_stress",
+        "feed_roundtrip",
+        "differential_smoke",
+        "pool_verification",
+        "index_verification",
+        "feed_view_verification",
+        "risk_verification",
+        "fok_verification",
+        "study_workload_verification",
+        "study_observer_verification",
+        "evidence_validation",
+        "documentation_links",
+        "tooling_tamper_tests"
+      ]
+    }
+  },
+  "differential": {
+    "differential-v2.json": {
+      "status": "pass",
+      "commands_compared": 100000000,
+      "reports_compared": 209631029,
+      "trades_compared": 34195803,
+      "linear_fok_variant_compared": true
+    },
+    "differential-asan-v2.json": {
+      "status": "pass",
+      "commands_compared": 1000000,
+      "reports_compared": 2096685,
+      "trades_compared": 342526,
+      "linear_fok_variant_compared": true
+    }
+  },
+  "limits": [
+    "LeakSanitizer was disabled locally because container ptrace prevents task inspection. ASan and UBSan remained enabled.",
+    "Core/diagnostic/sampled queue measurements have distinct timing boundaries."
+  ]
+}
