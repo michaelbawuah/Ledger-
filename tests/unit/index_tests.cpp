@@ -164,6 +164,52 @@ void wrapped_clusters_and_mixed_home_buckets() {
     require(mixed.entries()[1].id == 0, "mixed-home terminal hole was not cleared");
 }
 
+std::uint64_t random_step(std::uint64_t& state) noexcept {
+    state ^= state << 13;
+    state ^= state >> 7;
+    state ^= state << 17;
+    return state;
+}
+
+void long_running_half_full_churn() {
+    for (const auto max_orders : {1U, 3U, 31U, 128U}) {
+        IdIndex index{max_orders};
+        Oracle oracle;
+        std::vector<OrderId> active(max_orders);
+        std::uint64_t random = UINT64_C(0xf823974acd137ec5) ^ max_orders;
+        auto fresh_id = [&] {
+            OrderId id{};
+            do { id = random_step(random); } while (id == 0 || oracle.contains(id));
+            return id;
+        };
+        for (Slot slot = 0; slot < max_orders; ++slot) {
+            active[slot] = fresh_id();
+            index.insert(active[slot], slot);
+            oracle.emplace(active[slot], slot);
+        }
+        verify_index(index, oracle);
+        for (std::uint64_t iteration = 0; iteration < 200000; ++iteration) {
+            const auto slot = static_cast<Slot>(random_step(random) % max_orders);
+            const auto removed = active[slot];
+            require(index.erase(removed), "sustained churn erase failed");
+            oracle.erase(removed);
+            require(index.find(removed) == no_slot && !index.erase(removed), "churn removed key persisted");
+            const auto replacement = fresh_id();
+            active[slot] = replacement;
+            index.insert(replacement, slot);
+            oracle.emplace(replacement, slot);
+            require(index.find(replacement) == slot && index.size() == max_orders, "churn replacement lookup/count");
+            const auto sample_slot = static_cast<Slot>(random_step(random) % max_orders);
+            require(index.find(active[sample_slot]) == sample_slot, "churn damaged a retained entry");
+            if (iteration % 251 == 0) verify_index(index, oracle);
+        }
+        verify_index(index, oracle);
+        for (const auto id : active) require(index.erase(id), "churn final drain failed");
+        oracle.clear();
+        verify_index(index, oracle);
+    }
+}
+
 template <class Function> void run(const char* name, Function function) {
     function();
     std::cout << "PASS " << name << '\n';
@@ -175,6 +221,7 @@ int main() {
         run("capacity_rounding_and_full_width_keys", capacity_rounding_and_full_width_keys);
         run("collision_cluster_deletion", collision_cluster_deletion);
         run("wrapped_clusters_and_mixed_home_buckets", wrapped_clusters_and_mixed_home_buckets);
+        run("long_running_half_full_churn", long_running_half_full_churn);
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL index suite: " << error.what() << '\n';
