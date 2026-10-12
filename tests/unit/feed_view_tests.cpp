@@ -63,12 +63,43 @@ void test_valid_and_empty() {
     require(FeedView::parse(empty, view, 0) && view.valid() && view.empty(), "empty feed rejected");
     require(view.begin() == view.end() && !view.read(0, output), "empty feed exposed a record");
 }
+
+void test_framing_and_header() {
+    const auto bytes = fixture(commands);
+    FeedView retained;
+    require(FeedView::parse(bytes, retained), "failed to build retained view");
+    const auto pointer = retained.encoded_records().data();
+    auto rejected = [&](std::span<const std::byte> candidate, std::uint64_t cap = 20'000'000) {
+        require(!FeedView::parse(candidate, retained, cap), "malformed framing accepted");
+        require(retained.valid() && retained.size() == commands.size()
+                && retained.encoded_records().data() == pointer
+                && std::ranges::equal(retained, commands), "failed parse replaced previous view");
+    };
+    for (std::size_t length = 0; length < bytes.size(); ++length)
+        rejected(std::span(bytes).first(length));
+    auto trailing = bytes; trailing.push_back(std::byte{0}); rejected(trailing);
+    trailing = bytes; trailing.insert(trailing.end(), feed_record_size, std::byte{0}); rejected(trailing);
+    for (const std::size_t offset : {0u, 7u, 8u, 9u, 10u, 11u, 12u, 13u, 14u, 15u,
+                                     24u, 25u, 26u, 27u, 28u, 29u, 30u, 31u}) {
+        auto malformed = bytes; malformed[offset] ^= std::byte{255}; rejected(malformed);
+    }
+    for (const std::uint64_t count : {std::uint64_t{0}, std::uint64_t{1}, std::uint64_t{4},
+                                     std::uint64_t{20'000'001}, std::uint64_t{1} << 63,
+                                     std::numeric_limits<std::uint64_t>::max()}) {
+        auto malformed = bytes; put(malformed, 16, 8, count);
+        rejected(malformed, std::numeric_limits<std::uint64_t>::max());
+    }
+    rejected(bytes, 0); rejected(bytes, commands.size() - 1);
+    require(FeedView::parse(bytes, retained, commands.size()), "exact record cap rejected");
+    auto empty_with_tail = fixture({}); empty_with_tail.push_back(std::byte{0}); rejected(empty_with_tail);
+}
 }
 
 int main() {
     try {
         test_valid_and_empty();
-        std::cout << "PASS borrowed feed view, indexed decode, forward iteration and empty feeds\n";
+        test_framing_and_header();
+        std::cout << "PASS feed views, iteration, empty feeds, hostile headers and exact framing\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL " << error.what() << '\n'; return 1;
