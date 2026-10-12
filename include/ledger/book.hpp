@@ -6,7 +6,7 @@
 namespace ledger {
 class FastBook {
 public:
-    explicit FastBook(Config config = {}, bool bitmap_search = true);
+    explicit FastBook(Config config = {}, bool bitmap_search = true, bool bitmap_fok = true);
     ProcessResult process(const Command& command, EventBuffer& output) noexcept;
     Snapshot snapshot() const;
     bool check_invariants() const;
@@ -36,6 +36,7 @@ private:
     std::size_t best(Side side) const noexcept;
     std::size_t find_best(Side side) const noexcept;
     std::size_t find_next(Side side, std::size_t starting_level) const noexcept;
+    std::size_t find_next_bitmap(Side side, std::size_t starting_level) const noexcept;
     bool crosses(const Command& command, Price maker_price) const noexcept;
     bool can_fill(const Command& command) const noexcept;
     void add_resting(const Command& command, Quantity remaining) noexcept;
@@ -45,6 +46,7 @@ private:
 
     Config config_;
     bool bitmap_search_;
+    bool bitmap_fok_;
     detail::OrderPool pool_;
     detail::IdIndex index_;
     std::vector<Level> bids_, asks_;

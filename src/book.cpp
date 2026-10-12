@@ -16,8 +16,8 @@ std::size_t FastBook::level_count(Config config) {
         throw std::length_error("price range exceeds addressable flat-level storage");
     return static_cast<std::size_t>(count);
 }
-FastBook::FastBook(Config config, bool bitmap_search)
-    : config_(validate_config(config)), bitmap_search_(bitmap_search), pool_(config_.max_orders),
+FastBook::FastBook(Config config, bool bitmap_search, bool bitmap_fok)
+    : config_(validate_config(config)), bitmap_search_(bitmap_search), bitmap_fok_(bitmap_fok), pool_(config_.max_orders),
       index_(config_.max_orders), bids_(level_count(config_)), asks_(bids_.size()),
       bid_bitmap_(bids_.size() / 64 + (bids_.size() % 64 != 0)), ask_bitmap_(bid_bitmap_.size()) {}
 
@@ -47,6 +47,9 @@ std::size_t FastBook::find_next(Side side, std::size_t starting_level) const noe
         }
         return no_level;
     }
+    return find_next_bitmap(side, starting_level);
+}
+std::size_t FastBook::find_next_bitmap(Side side, std::size_t starting_level) const noexcept {
     const auto& bits = bitmap(side);
     const std::size_t first_word = starting_level / 64;
     const unsigned first_bit = static_cast<unsigned>(starting_level % 64);
@@ -72,6 +75,21 @@ bool FastBook::can_fill(const Command& command) const noexcept {
     const std::size_t first = best(opposite);
     if (first == no_level) return false;
     std::uint64_t available = 0;
+    if (bitmap_fok_) {
+        std::size_t level = first;
+        while (level != no_level && crosses(command, price_at(level))) {
+            available += side_levels[level].quantity;
+            if (available >= command.quantity) return true;
+            if (opposite == Side::Sell) {
+                if (level == side_levels.size() - 1) break;
+                level = find_next_bitmap(opposite, level + 1);
+            } else {
+                if (level == 0) break;
+                level = find_next_bitmap(opposite, level - 1);
+            }
+        }
+        return false;
+    }
     if (opposite == Side::Sell) {
         for (std::size_t i = first; i < side_levels.size() && crosses(command, price_at(i)); ++i) {
             available += side_levels[i].quantity;
