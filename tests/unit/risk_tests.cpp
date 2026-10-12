@@ -170,6 +170,43 @@ void notional_without_overflow() {
     command.price = 1;
     expect(extreme, command, RiskReject::None);
 }
+
+void projected_inventory_limits() {
+    using namespace ledger;
+    RiskConfig config{};
+    config.max_abs_inventory = 100;
+    const RiskPolicy policy(config);
+    auto command = limit_order();
+    expect(policy, command, RiskReject::None, {90, 0});
+    require(policy.evaluate(command, {90, 0}).projected_inventory == 100, "buy projection differs");
+    expect(policy, command, RiskReject::InventoryLimit, {91, 0});
+    expect(policy, command, RiskReject::None, {-110, 0}); // Recovery to the allowed interval.
+    command.side = Side::Sell;
+    expect(policy, command, RiskReject::None, {-90, 0});
+    require(policy.evaluate(command, {-90, 0}).projected_inventory == -100, "sell projection differs");
+    expect(policy, command, RiskReject::InventoryLimit, {-91, 0});
+    expect(policy, command, RiskReject::None, {110, 0});
+
+    config.max_abs_inventory = 0;
+    const RiskPolicy flat_only(config);
+    expect(flat_only, command, RiskReject::None, {10, 0});
+    expect(flat_only, command, RiskReject::InventoryLimit, {9, 0});
+
+    config.max_abs_inventory = std::numeric_limits<std::int64_t>::max();
+    const RiskPolicy extreme(config);
+    command.quantity = 1;
+    const auto low = std::numeric_limits<std::int64_t>::min();
+    const auto high = std::numeric_limits<std::int64_t>::max();
+    expect(extreme, command, RiskReject::InventoryOverflow, {low, 0});
+    expect(extreme, command, RiskReject::InventoryLimit, {low + 1, 0});
+    expect(extreme, command, RiskReject::None, {high, 0});
+    command.side = Side::Buy;
+    expect(extreme, command, RiskReject::InventoryOverflow, {high, 0});
+    expect(extreme, command, RiskReject::None, {high - 1, 0});
+    expect(extreme, command, RiskReject::None, {low, 0});
+    require(extreme.evaluate(command, {low, 0}).projected_inventory == low + 1,
+            "INT64_MIN buy recovery differs");
+}
 } // namespace
 
 int main() {
@@ -179,7 +216,8 @@ int main() {
         quantity_limits();
         integer_price_band();
         notional_without_overflow();
-        std::cout << "PASS risk validation and overflow-safe integer notional limits\n";
+        projected_inventory_limits();
+        std::cout << "PASS risk validation, notional, and signed inventory boundaries\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL " << error.what() << '\n';

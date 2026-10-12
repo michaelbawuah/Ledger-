@@ -27,6 +27,7 @@ enum class RiskReject : std::uint8_t {
     InvalidQuantity, OrderQuantityLimit,
     MissingMarketValuation, InvalidPrice, PriceBand,
     OrderNotionalLimit,
+    InventoryOverflow, InventoryLimit,
 };
 
 struct RiskDecision {
@@ -72,7 +73,18 @@ public:
             return {RiskReject::OrderNotionalLimit};
         }
         const auto notional = unsigned_price * static_cast<std::uint64_t>(command.quantity);
-        return {RiskReject::None, context.position, valuation, notional};
+        const auto quantity = static_cast<std::int64_t>(command.quantity);
+        const bool buy = command.side == Side::Buy;
+        if ((buy && context.position > std::numeric_limits<std::int64_t>::max() - quantity) ||
+            (!buy && context.position < std::numeric_limits<std::int64_t>::min() + quantity)) {
+            return {RiskReject::InventoryOverflow};
+        }
+        const auto projected = buy ? context.position + quantity : context.position - quantity;
+        // Compare an interval instead of abs(projected), which fails at INT64_MIN.
+        if (projected < -config_.max_abs_inventory || projected > config_.max_abs_inventory) {
+            return {RiskReject::InventoryLimit};
+        }
+        return {RiskReject::None, projected, valuation, notional};
     }
 
 private:
