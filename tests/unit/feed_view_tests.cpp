@@ -93,13 +93,43 @@ void test_framing_and_header() {
     require(FeedView::parse(bytes, retained, commands.size()), "exact record cap rejected");
     auto empty_with_tail = fixture({}); empty_with_tail.push_back(std::byte{0}); rejected(empty_with_tail);
 }
+
+void test_all_record_validation() {
+    const auto bytes = fixture(commands);
+    FeedView retained;
+    require(FeedView::parse(bytes, retained), "failed to create retained valid view");
+    const auto original = retained.encoded_records();
+    // A valid header and early records must never expose a partially parsed
+    // feed when any later record has an invalid enum or nonzero reserved field.
+    for (std::size_t record = 0; record < commands.size(); ++record) {
+        for (std::size_t offset = 28; offset < feed_record_size; ++offset) {
+            auto malformed = bytes;
+            malformed[feed_header_size + record * feed_record_size + offset] = std::byte{255};
+            require(!FeedView::parse(malformed, retained), "invalid record was accepted");
+            require(retained.encoded_records().data() == original.data()
+                    && retained.encoded_records().size() == original.size()
+                    && std::ranges::equal(retained, commands), "late invalid record changed published view");
+            FeedView invalid;
+            require(!FeedView::parse(malformed, invalid) && !invalid.valid() && invalid.empty(),
+                    "failure exposed records in default view");
+        }
+    }
+    const std::array semantic_errors{
+        Command{0, 0, -100, 0, Side::Buy, Action::Limit, TimeInForce::GTC},
+        Command{0, 0, std::numeric_limits<Price>::max(), 0, Side::Sell, Action::Replace, TimeInForce::FOK},
+    };
+    const auto framed = fixture(semantic_errors);
+    require(FeedView::parse(framed, retained) && std::ranges::equal(retained, semantic_errors),
+            "framing preflight incorrectly rejected engine-semantic errors");
+}
 }
 
 int main() {
     try {
         test_valid_and_empty();
         test_framing_and_header();
-        std::cout << "PASS feed views, iteration, empty feeds, hostile headers and exact framing\n";
+        test_all_record_validation();
+        std::cout << "PASS feed views, exact framing, every-record preflight and failure atomicity\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL " << error.what() << '\n'; return 1;
