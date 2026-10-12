@@ -33,6 +33,12 @@ foreach(pair IN ITEMS "ledger_replay;src/replay.cpp" "ledger_generate;bench/gen_
   add_executable(${target} ${source})
   target_link_libraries(${target} PRIVATE ledger)
 endforeach()
+set(ledger_bench_isa "")
+if(LEDGER_NATIVE)
+  set(ledger_bench_isa "-march=native")
+endif()
+target_compile_definitions(ledger_bench PRIVATE
+  LEDGER_COMPILER_FLAGS="${CMAKE_CXX_FLAGS} $<$<CONFIG:Release>:${CMAKE_CXX_FLAGS_RELEASE}> $<$<CONFIG:Debug>:${CMAKE_CXX_FLAGS_DEBUG}> ${ledger_bench_isa} standard=C++23")
 
 include(CTest)
 if(BUILD_TESTING)

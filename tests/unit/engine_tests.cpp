@@ -265,6 +265,21 @@ template<class B> void invalid_configuration_rejected() {
         bool rejected = false; try { B book{config}; } catch (const std::exception&) { rejected = true; } CHECK(rejected);
     }
 }
+template<class B> void extreme_valid_price_interval() {
+    constexpr auto maximum_price = std::numeric_limits<Price>::max();
+    constexpr auto maximum_id = std::numeric_limits<OrderId>::max();
+    constexpr auto maximum_quantity = std::numeric_limits<Quantity>::max();
+    B book{Config{maximum_price - 128, maximum_price, 16}};
+    std::array<Event, required_event_capacity(16)> storage{}; EventBuffer output{storage};
+    CHECK(book.process({1, maximum_id, maximum_price - 64, maximum_quantity, Side::Buy, Action::Limit, TimeInForce::GTC}, output) == ProcessResult::Applied);
+    CHECK(book.process({2, 1, maximum_price, maximum_quantity, Side::Sell, Action::Limit, TimeInForce::GTC}, output) == ProcessResult::Applied);
+    CHECK(book.best_bid() == maximum_price - 64); CHECK(book.best_ask() == maximum_price);
+    CHECK(book.process({3, 2, maximum_price - 128, maximum_quantity, Side::Sell, Action::Limit, TimeInForce::FOK}, output) == ProcessResult::Applied);
+    CHECK(output.events()[1].type == EventType::Trade); CHECK(output.events()[1].price == maximum_price - 64); CHECK(output.events()[1].contra_id == maximum_id);
+    CHECK(book.process({4, maximum_id, 0, maximum_quantity, Side::Buy, Action::Market, TimeInForce::GTC}, output) == ProcessResult::Applied);
+    CHECK(output.events()[1].price == maximum_price); CHECK(book.size() == 0); CHECK(book.check_invariants());
+    CHECK(book.stats().submitted == 2 * book.stats().executed); CHECK(book.stats().executed == 2ULL * maximum_quantity);
+}
 
 using Case = std::pair<std::string, std::function<void()>>;
 template<class B> void add_cases(std::vector<Case>& cases, const std::string& prefix) {
@@ -277,7 +292,7 @@ template<class B> void add_cases(std::vector<Case>& cases, const std::string& pr
     ADD(full_capacity_replace_reuses_slot); ADD(maximum_quantity_and_wide_level_sum); ADD(maximum_id_and_id_reuse); ADD(duplicate_id_rejected_for_all_tif);
     ADD(unknown_id_and_wrong_side); ADD(invalid_id_price_quantity); ADD(invalid_enum_values); ADD(undersized_output_is_atomic_and_cleared);
     ADD(output_buffer_reused_clears_previous_reports); ADD(snapshot_order_and_boundary_prices); ADD(sparse_bitmap_word_boundaries);
-    ADD(cancel_replace_after_partial_fill); ADD(malformed_replace_enum_preserves_original); ADD(rejected_command_counts_outside_conservation); ADD(invalid_configuration_rejected);
+    ADD(cancel_replace_after_partial_fill); ADD(malformed_replace_enum_preserves_original); ADD(rejected_command_counts_outside_conservation); ADD(invalid_configuration_rejected); ADD(extreme_valid_price_interval);
 #undef ADD
 }
 #ifdef LEDGER_USE_GTEST

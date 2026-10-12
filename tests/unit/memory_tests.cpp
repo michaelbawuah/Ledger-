@@ -8,6 +8,9 @@
 #include <new>
 #include <stdexcept>
 #include <type_traits>
+#ifdef _WIN32
+#include <malloc.h>
+#endif
 
 namespace {
 thread_local bool tracking = false;
@@ -20,8 +23,20 @@ void* allocate(std::size_t bytes) {
 }
 void* allocate_aligned(std::size_t bytes, std::size_t alignment) {
     count_allocation(); void* value{};
+#ifdef _WIN32
+    value = _aligned_malloc(bytes ? bytes : alignment, alignment);
+    if (value) return value;
+#else
     if (posix_memalign(&value, alignment, bytes ? bytes : alignment) == 0) return value;
+#endif
     throw std::bad_alloc{};
+}
+void free_aligned(void* value) noexcept {
+#ifdef _WIN32
+    _aligned_free(value);
+#else
+    std::free(value);
+#endif
 }
 }
 
@@ -39,18 +54,18 @@ void operator delete(void* value, const std::nothrow_t&) noexcept { std::free(va
 void operator delete[](void* value, const std::nothrow_t&) noexcept { std::free(value); }
 void* operator new(std::size_t bytes, std::align_val_t alignment) { return allocate_aligned(bytes, static_cast<std::size_t>(alignment)); }
 void* operator new[](std::size_t bytes, std::align_val_t alignment) { return allocate_aligned(bytes, static_cast<std::size_t>(alignment)); }
-void operator delete(void* value, std::align_val_t) noexcept { std::free(value); }
-void operator delete[](void* value, std::align_val_t) noexcept { std::free(value); }
-void operator delete(void* value, std::size_t, std::align_val_t) noexcept { std::free(value); }
-void operator delete[](void* value, std::size_t, std::align_val_t) noexcept { std::free(value); }
+void operator delete(void* value, std::align_val_t) noexcept { free_aligned(value); }
+void operator delete[](void* value, std::align_val_t) noexcept { free_aligned(value); }
+void operator delete(void* value, std::size_t, std::align_val_t) noexcept { free_aligned(value); }
+void operator delete[](void* value, std::size_t, std::align_val_t) noexcept { free_aligned(value); }
 void* operator new(std::size_t bytes, std::align_val_t alignment, const std::nothrow_t&) noexcept {
     try { return allocate_aligned(bytes, static_cast<std::size_t>(alignment)); } catch (...) { return nullptr; }
 }
 void* operator new[](std::size_t bytes, std::align_val_t alignment, const std::nothrow_t&) noexcept {
     try { return allocate_aligned(bytes, static_cast<std::size_t>(alignment)); } catch (...) { return nullptr; }
 }
-void operator delete(void* value, std::align_val_t, const std::nothrow_t&) noexcept { std::free(value); }
-void operator delete[](void* value, std::align_val_t, const std::nothrow_t&) noexcept { std::free(value); }
+void operator delete(void* value, std::align_val_t, const std::nothrow_t&) noexcept { free_aligned(value); }
+void operator delete[](void* value, std::align_val_t, const std::nothrow_t&) noexcept { free_aligned(value); }
 
 namespace {
 using namespace ledger;
