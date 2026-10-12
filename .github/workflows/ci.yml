@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - run: cmake --preset fuzz && cmake --build --preset fuzz --parallel 2
-      - run: mkdir -p build/corpus && build/fuzz/ledger_parser_fuzz build/corpus -max_total_time=30 -timeout=5
+      - run: python3 tools/make_fuzz_corpus.py build/corpus && build/fuzz/ledger_parser_fuzz build/corpus -max_total_time=30 -timeout=5
   thread-sanitizer:
     runs-on: ubuntu-latest
     steps:

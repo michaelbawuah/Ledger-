@@ -54,6 +54,11 @@ flowchart TD
 An optional SPSC adapter passes commands from one feed thread to one matching
 thread. The matching core itself stays single-threaded and deterministic.
 
+Additional components include a validated span-backed [feed view](docs/feed-format.md)
+with no command-vector allocation and an optional integer [pre-trade risk
+policy](docs/risk.md). The policy checks quantity, price, notional and projected
+position; callers own pending-order reservations and invoke it explicitly.
+
 | Component | Implementation | Cost / boundary |
 |---|---|---|
 | Prices | Positive `int64_t` ticks | Exact comparisons; configured range |
@@ -110,6 +115,13 @@ committed. [results.md](docs/results.md) records measurement limits and profilin
 - Header/record parser fuzzing under libFuzzer, ASan and UBSan; seeded and
   unseeded campaigns complete without a finding.
 - SPSC full/empty/wrap tests and 1M exact transfers pass under ThreadSanitizer.
+- Dedicated [pool/index suites](docs/memory.md) cover collision-cluster deletion,
+  wrapped probing, exhaustive slot recycling and long-running ownership churn.
+- Feed-view tests cover hostile full-feed framing, unaligned golden bytes and
+  1,000 allocation-free parse/access cycles. Risk tests cross-check 67,524
+  assertions against independent integer arithmetic.
+- Offline [evidence and documentation checks](docs/reproducibility.md) reconstruct
+  all 15 million recorded latency samples and reject tampered metrics.
 
 ```sh
 build/release/ledger_differential --seeds 100 --orders 1000000

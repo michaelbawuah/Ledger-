@@ -1,4 +1,5 @@
 #include "ledger/feed.hpp"
+#include "ledger/feed_view.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -34,6 +35,27 @@ void check_header(std::span<const std::byte> input, std::uint64_t limit) {
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     const auto input = std::span{reinterpret_cast<const std::byte*>(data), size};
+    // Validate a complete zero-copy feed in addition to individual wire fields.
+    ledger::FeedView view;
+    if (ledger::FeedView::parse(input, view)) {
+        check(view.valid());
+        check(size >= ledger::feed_header_size);
+        check(view.size() == (size - ledger::feed_header_size) / ledger::feed_record_size);
+        std::size_t index = 0;
+        for (const auto command : view) {
+            ledger::Command indexed{};
+            check(view.read(index, indexed) && indexed == command);
+            const auto encoded = ledger::encode_record(command);
+            check(std::equal(encoded.begin(), encoded.end(),
+                             input.begin() + ledger::feed_header_size + index * ledger::feed_record_size));
+            ++index;
+        }
+        check(index == view.size());
+        ledger::Command sentinel{};
+        check(!view.read(view.size(), sentinel));
+    } else {
+        check(!view.valid() && view.empty());
+    }
     // Exact framing, truncated/overlong inputs, enums, reserved bytes and rejected
     // decoder output atomicity are checked independently of engine validation.
     check_record(input); check_header(input, 20'000'000);
